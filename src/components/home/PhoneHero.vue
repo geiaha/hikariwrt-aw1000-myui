@@ -4,13 +4,23 @@ import HkIcon from '@/components/icons/HkIcon.vue'
 import type { UplinkView } from '@/composables/home'
 import type { ModemStatus } from '@/api/modem'
 import { signed } from '@/utils/format'
+import { uptimePct } from '@/utils/series'
 
 // Phone hero: the same status as the desktop hero, with the uplinks as a
 // connected list instead of a diagram.
-const props = defineProps<{ uplinks: UplinkView[] | null; modem: ModemStatus | null }>()
+const props = defineProps<{
+  uplinks: UplinkView[] | null
+  modem: ModemStatus | null
+  /** 24-hour uptime per WAN name, from the monitor (null without it). */
+  uptime?: Record<string, number | null> | null
+}>()
 
 const active = computed(() => props.uplinks?.find((u) => u.state === 'active') ?? null)
 const standby = computed(() => props.uplinks?.filter((u) => u.state === 'standby') ?? [])
+const uptimeToday = computed(() => {
+  const v = active.value ? props.uptime?.[active.value.name] : null
+  return v == null ? null : uptimePct(v)
+})
 
 function detail(u: UplinkView): string {
   if (u.cellular && props.modem?.operator) {
@@ -31,6 +41,7 @@ const WORD = { active: 'In use', standby: 'Standby', down: 'Down' } as const
         <template v-if="active">via {{ active.label }}<template v-if="standby.length"> · {{ standby.map((s) => (s.cellular ? '5G' : s.label)).join(', ') }} on standby</template></template>
         <template v-else>No uplink is carrying traffic</template>
       </span>
+      <RouterLink v-if="uptimeToday" to="/monitoring" class="hk-phero__uptime">{{ uptimeToday }} uptime today →</RouterLink>
     </div>
     <div class="hk-phero__list">
       <div v-for="u in uplinks ?? []" :key="u.name" class="hk-phero__row" :class="`is-${u.state}`">
@@ -46,6 +57,17 @@ const WORD = { active: 'In use', standby: 'Standby', down: 'Down' } as const
 </template>
 
 <style scoped>
+.hk-phero__uptime {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 4px 12px;
+  border-radius: 16px;
+  background: rgba(var(--v-theme-on-primary-container), 0.1);
+  color: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
 .hk-phero {
   background: rgb(var(--v-theme-primary-container));
   color: rgb(var(--v-theme-on-primary-container));

@@ -17,6 +17,7 @@ import { usePoll } from '@/composables/poll'
 import { useSession } from '@/stores/session'
 import { useUi } from '@/stores/ui'
 import { uplinkViews } from '@/utils/uplinks'
+import { useUptimeToday } from '@/composables/uptime'
 
 // Internet: live uplink status (5 s, the same sources as Home), and the
 // settings behind it. Settings load once and again after each save.
@@ -24,6 +25,8 @@ const { xs } = useDisplay()
 const session = useSession()
 const ui = useUi()
 const hasModem = computed(() => session.has('luci.aw1000-modem'))
+const uptime = useUptimeToday()
+const hasMonitor = computed(() => session.has('luci.aw1000-monitor'))
 
 const live = usePoll(async () => {
   const [ifaces, mw, st] = await Promise.all([
@@ -60,14 +63,17 @@ function saved(): void {
 <template>
   <PageHeader overline="Uplinks, failover and 5G" title="Internet">
     <template #actions>
+      <v-btn v-if="hasMonitor" variant="text" color="primary" height="48" rounded="pill" to="/monitoring">
+        <HkIcon name="chart" :size="18" class="mr-2" />Uptime &amp; quality
+      </v-btn>
       <v-btn variant="flat" color="secondary-container" height="48" rounded="pill" @click="ui.openSpeedTest()">
         <HkIcon name="speed" :size="18" class="mr-2" />Speed test
       </v-btn>
     </template>
   </PageHeader>
 
-  <PhoneHero v-if="xs" :uplinks="uplinks" :modem="live.data.value?.modem ?? null" />
-  <ConnectionHero v-else :uplinks="uplinks" :modem="live.data.value?.modem ?? null" :lan-ip="lanIp" :clients="null" hide-clients />
+  <PhoneHero v-if="xs" :uplinks="uplinks" :modem="live.data.value?.modem ?? null" :uptime="uptime" />
+  <ConnectionHero v-else :uplinks="uplinks" :modem="live.data.value?.modem ?? null" :lan-ip="lanIp" :clients="null" hide-clients :uptime="uptime" />
 
   <div class="hk-inet">
     <WanSettingsCard class="hk-inet__wide" :config="wan" :link="wired" @saved="saved" />

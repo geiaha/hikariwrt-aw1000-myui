@@ -23,6 +23,7 @@ export const ICONS = {
   storage: { body: '<rect x="3" y="13" width="18" height="7" rx="2"/><path d="M5.5 13l2-8h9l2 8"/><circle cx="17" cy="16.5" r="0.8"/>' },
   system: { body: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>' },
   advanced: { body: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>' },
+  chart: { body: '<path d="M4 4v15.5a.5.5 0 0 0 .5.5H20"/><path d="M7.5 15l4-5 3 3 5-6.5"/>' },
   search: { body: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>' },
   logout: { body: '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l4-4-4-4M14 12H4"/>' },
   check: { body: '<path d="M5 12.5l4.5 4.5L19 7.5"/>', stroke: 3 },

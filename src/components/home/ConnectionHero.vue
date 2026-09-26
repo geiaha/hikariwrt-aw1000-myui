@@ -4,6 +4,7 @@ import HkIcon from '@/components/icons/HkIcon.vue'
 import type { UplinkView } from '@/composables/home'
 import type { ModemStatus } from '@/api/modem'
 import { durationLong } from '@/utils/format'
+import { uptimePct } from '@/utils/series'
 
 // The primary-container hero: status text on the left, and the connection
 // drawn as a path: Internet -> uplinks (solid = carrying traffic, dashed =
@@ -15,7 +16,15 @@ const props = defineProps<{
   clients: number | null
   /** The Internet page draws the path up to the router only. */
   hideClients?: boolean
+  /** 24-hour uptime per WAN name, from the monitor (null without it). */
+  uptime?: Record<string, number | null> | null
 }>()
+
+const uptimeToday = computed(() => {
+  const name = active.value?.name
+  const v = name ? props.uptime?.[name] : null
+  return v == null ? null : uptimePct(v)
+})
 
 const active = computed(() => props.uplinks?.find((u) => u.state === 'active') ?? null)
 const standby = computed(() => props.uplinks?.filter((u) => u.state === 'standby') ?? [])
@@ -49,6 +58,7 @@ const STATE_WORD = { active: 'active', standby: 'standby', down: 'down' } as con
         <template v-if="active?.uptime != null && lanIp"> · </template>
         <template v-if="lanIp">LAN {{ lanIp }}</template>
       </span>
+      <RouterLink v-if="uptimeToday" to="/monitoring" class="hk-hero__uptime">{{ uptimeToday }} uptime today →</RouterLink>
     </div>
 
     <div class="hk-hero__map" aria-hidden="true">
@@ -124,6 +134,20 @@ const STATE_WORD = { active: 'active', standby: 'standby', down: 'down' } as con
 }
 .hk-hero__sub {
   font-size: 15px;
+}
+.hk-hero__uptime {
+  align-self: flex-start;
+  margin-top: 6px;
+  padding: 4px 12px;
+  border-radius: 16px;
+  background: rgba(var(--v-theme-on-primary-container), 0.1);
+  color: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.hk-hero__uptime:hover {
+  background: rgba(var(--v-theme-on-primary-container), 0.16);
 }
 .hk-hero__meta {
   font-size: 13px;

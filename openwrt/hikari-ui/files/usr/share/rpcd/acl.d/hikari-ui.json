@@ -59,6 +59,11 @@
 					"status",
 					"job"
 				],
+				"luci.aw1000-monitor": [
+					"status",
+					"series",
+					"events"
+				],
 				"luci.aw1000-mesh": [
 					"status",
 					"peers",

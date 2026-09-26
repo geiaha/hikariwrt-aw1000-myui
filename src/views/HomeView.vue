@@ -13,10 +13,12 @@ import WanCard from '@/components/home/WanCard.vue'
 import WifiCard from '@/components/home/WifiCard.vue'
 import { useHomeData } from '@/composables/home'
 import { useSession } from '@/stores/session'
+import { useUptimeToday } from '@/composables/uptime'
 
 const { xs } = useDisplay()
 const session = useSession()
 const d = useHomeData()
+const uptime = useUptimeToday()
 
 const f = computed(() => d.fast.data.value)
 const s = computed(() => d.slow.data.value)
@@ -40,7 +42,7 @@ const changedBoth = () => {
 
   <!-- Phone layout -->
   <template v-if="xs">
-    <PhoneHero :uplinks="d.uplinks.value" :modem="f?.modem ?? null" />
+    <PhoneHero :uplinks="d.uplinks.value" :modem="f?.modem ?? null" :uptime="uptime" />
     <section aria-label="Quick settings" class="d-flex flex-column ga-2">
       <h2 class="text-muted" style="margin: 0; padding: 4px 4px 0; font-size: 14px; font-weight: 600">Quick settings</h2>
       <QuickSettings
@@ -64,7 +66,7 @@ const changedBoth = () => {
 
   <!-- Rail layout -->
   <template v-else>
-    <ConnectionHero :uplinks="d.uplinks.value" :modem="f?.modem ?? null" :lan-ip="d.lanIp.value" :clients="d.clients.value?.total ?? null" />
+    <ConnectionHero :uplinks="d.uplinks.value" :modem="f?.modem ?? null" :lan-ip="d.lanIp.value" :clients="d.clients.value?.total ?? null" :uptime="uptime" />
     <div class="hk-grid-3">
       <WanCard :link="d.wired.value" :loading="!f" />
       <CellCard v-if="d.hasModem.value" :modem="f?.modem ?? null" :link="d.cellular.value" :loading="!f" />
