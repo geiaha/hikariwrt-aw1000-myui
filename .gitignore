@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env.local
+.env.*.local
+*.log
+# Filled by `npm run package`; the OpenWrt package installs from here.
+openwrt/hikari-ui/files/www/

@@ -1,0 +1,139 @@
+{
+	"hikari-ui": {
+		"description": "HikariWrt admin UI: everything its pages read and switch",
+		"read": {
+			"ubus": {
+				"system": [
+					"board",
+					"info"
+				],
+				"network.interface": [
+					"dump"
+				],
+				"network.wireless": [
+					"status"
+				],
+				"luci-rpc": [
+					"getDHCPLeases",
+					"getHostHints",
+					"getNetworkDevices",
+					"getWirelessDevices"
+				],
+				"iwinfo": [
+					"info",
+					"assoclist",
+					"freqlist"
+				],
+				"session": [
+					"access",
+					"destroy"
+				],
+				"file": [
+					"read"
+				],
+				"uci": [
+					"get",
+					"changes"
+				],
+				"luci.aw1000-modem": [
+					"status",
+					"diag",
+					"lockinfo",
+					"usageinfo",
+					"smslist",
+					"profileinfo",
+					"ipv6info",
+					"routerstatus",
+					"scanstatus"
+				],
+				"luci.aw1000-speedtest": [
+					"status",
+					"interfaces"
+				],
+				"luci.aw1000-vpn": [
+					"list"
+				],
+				"luci.aw1000-storage": [
+					"status"
+				],
+				"luci.aw1000-mesh": [
+					"status"
+				]
+			},
+			"file": {
+				"/proc/stat": [
+					"read"
+				],
+				"/var/run/multiwan/status.json": [
+					"read"
+				]
+			},
+			"uci": [
+				"multiwan",
+				"wireless",
+				"adblock",
+				"network",
+				"dhcp",
+				"firewall"
+			]
+		},
+		"write": {
+			"ubus": {
+				"uci": [
+					"set",
+					"add",
+					"delete",
+					"commit",
+					"revert",
+					"apply",
+					"confirm"
+				],
+				"luci": [
+					"setInitAction"
+				],
+				"network.interface": [
+					"up",
+					"down"
+				],
+				"luci.aw1000-modem": [
+					"refresh",
+					"setbands",
+					"setmode",
+					"setlock",
+					"scanstart",
+					"scanclear",
+					"smsrefresh",
+					"smssend",
+					"smsdelete",
+					"smsdeleteall",
+					"smsstorage",
+					"atrun",
+					"setapn",
+					"setttl",
+					"usageset",
+					"usagereset",
+					"usageresume"
+				],
+				"luci.aw1000-speedtest": [
+					"start",
+					"cancel",
+					"accept"
+				],
+				"luci.aw1000-vpn": [
+					"enable"
+				],
+				"hostapd.*": [
+					"del_client"
+				]
+			},
+			"uci": [
+				"multiwan",
+				"wireless",
+				"adblock",
+				"network",
+				"dhcp",
+				"firewall"
+			]
+		}
+	}
+}

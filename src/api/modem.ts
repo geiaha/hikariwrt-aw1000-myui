@@ -1,0 +1,342 @@
+// luci.aw1000-modem (hikariwrt feed). Types list only what the UI reads.
+//
+// AT-port rule: `status`, `lockinfo`, `usageinfo`, `profileinfo`,
+// `routerstatus` are cheap/cached and may be polled. `diag`, `refresh`,
+// `smslist` and every set* talk to the modem: call them on page open or on
+// a user action, never on a timer.
+
+import { call } from './ubus'
+
+export interface ModemSignal {
+  tech: string
+  band: string
+  rsrp: number | null
+  rsrq: number | null
+  rssi: number | null
+  sinr: number | null
+  pci: number | null
+  arfcn: number | null
+  cell_id: string | null
+  percent: number
+  bars: number
+  quality: string
+}
+
+export interface ModemBand {
+  role: string
+  tech: string
+  band: string
+  bandwidth: number | null
+  pci: number | null
+  arfcn: number | null
+}
+
+export interface ModemStatus {
+  ok: boolean
+  sim: string
+  registered: boolean
+  mode?: string
+  mode_label?: string
+  operator?: string
+  tac?: string
+  gnb_id_bits?: number
+  error?: string | null
+  signal?: ModemSignal | null
+  ca?: { lte: number; nr: number; total: number; active: boolean }
+  bands?: ModemBand[]
+  identity?: { imei: string | null; imsi: string | null; iccid: string | null; msisdn: string | null }
+  link?: { interface: string; up: boolean; uptime: number; ipv4: string | null; ipv6: string | null }
+}
+
+export interface ModemDiag {
+  ok: boolean
+  module?: { manufacturer: string; model: string; revision: string; firmware: string }
+  registration?: { ims: number; ims_reg: number }
+  temperatures?: { sensor: string; celsius: number }[]
+}
+
+export interface BandSet {
+  supported: number[]
+  effective: number[]
+  configured: number[]
+}
+
+export interface LteCellRef {
+  arfcn: number
+  pci: number
+}
+export interface NrCellRef {
+  arfcn: number
+  pci: number
+  band: number
+  scs: number
+}
+
+export interface KnownCell {
+  tech: 'LTE' | 'NR'
+  arfcn: number
+  pci: number
+  band: number | null
+  scs: number | null
+  rsrp: number | null
+  quality: string
+  rsrq: number | null
+  plmn: string | null
+  cellid: string | null
+  bandwidth: number | null
+  source: 'serving' | 'ca' | 'neighbour' | 'scan'
+  age: number
+  lockable: boolean
+}
+
+export interface LockInfo {
+  ok: boolean
+  error?: string
+  bands: { lte: BandSet; nsa: BandSet; sa: BandSet; gw: BandSet }
+  mode: { pref: string; nr5g_disable: number; rat_order: string }
+  cell_lock: {
+    lte: { count: number; max: number; cells: LteCellRef[] }
+    nr: NrCellRef | null
+  }
+  cells: KnownCell[]
+  saved?: { persist: boolean; lte: LteCellRef[]; nr: NrCellRef | null }
+}
+
+export interface ScanStatus {
+  ok: boolean
+  state: 'idle' | 'running' | 'done' | 'failed'
+  running: boolean
+  supported: boolean
+  started: number | null
+  finished: number | null
+  elapsed: number | null
+  timeout: number
+  found: number | null
+  error: string | null
+  warning: string | null
+}
+
+/** Envelope of lock/SMS/profile writes: `state` is a fresh read. */
+export interface WriteReply<T> {
+  ok: boolean
+  action?: string
+  changed?: boolean
+  warning?: string
+  error?: string
+  state?: T
+}
+
+export interface UsageTotal {
+  rx: number
+  tx: number
+  total: number
+}
+
+export interface UsageInfo {
+  ok: boolean
+  enabled: boolean
+  clock_ok?: boolean
+  link_up?: boolean
+  settings: {
+    limit: number
+    limit_value: number
+    unit: string
+    decimal?: boolean
+    reset_day: number
+    warn_percent: number
+    sms_notify: boolean
+    sms_number: string | null
+    action: string
+    retain_days: number
+  }
+  period: { start: string; end: string; next: string; days: number; elapsed: number; left: number }
+  cycle: {
+    rx: number
+    tx: number
+    total: number
+    percent: number
+    remaining: number
+    limit_human: string
+    projected: number
+    over: boolean
+    warn: boolean
+  }
+  totals?: Record<'today' | 'week' | 'cycle' | 'month' | 'days30' | 'all', UsageTotal>
+  state?: { blocked: boolean; override: boolean; warned: boolean }
+  days?: { date: string; rx: number; tx: number; total: number }[]
+}
+
+export interface SmsPart {
+  index: number
+  sender: string
+  timestamp: string
+  reference?: number
+  part?: number
+  total?: number
+  content: string
+}
+
+export interface SmsList {
+  ok: boolean
+  error?: string
+  incoming: string | null
+  incoming_label?: string
+  smsc?: string
+  saved?: { storage: string; persist: boolean }
+  stores: { name: string; label: string; used: number; total: number; msg: SmsPart[] }[]
+}
+
+export interface Carrier {
+  id: string
+  mcc: string
+  mnc: string
+  country: string
+  name: string
+  apn: string
+  auth: string
+  username?: string
+  password?: string
+  pdptype: string
+}
+
+export interface ProfileInfo {
+  ok: boolean
+  apn: {
+    mode: 'auto' | 'list' | 'custom' | string
+    carrier: string
+    value: string
+    auth: string
+    username: string
+    has_password: boolean
+    pdptype: string
+    modem_context: string
+  }
+  apn_verify: number
+  verify: { state: 'pending' | 'ok' | 'rolled_back' | string; at: number | null; restored: string }
+  ttl: { value: number; active: boolean }
+  mcc: string
+  carriers?: Carrier[]
+}
+
+export interface Ipv6Info {
+  ok: boolean
+  config: { mode: string; style: string; pdptype: string; nat64: string; delegate: string; passthrough: string }
+  call: { up: boolean; families: string; ipv4: string; ipv6: string; ipv6_length: string; prefix: string; prefix_length: string }
+  assessment: { state: string; text: string; style: string; why: string }
+}
+
+export interface RouterStatus {
+  ok: boolean
+  mode: string
+  applied: string
+  pending: boolean
+  services?: { name: string; state: string }[]
+}
+
+export const status = () => call<ModemStatus>('luci.aw1000-modem', 'status')
+export const diag = () => call<ModemDiag>('luci.aw1000-modem', 'diag')
+export const refresh = () => call<ModemStatus>('luci.aw1000-modem', 'refresh')
+export const lockinfo = () => call<LockInfo>('luci.aw1000-modem', 'lockinfo')
+export const usageinfo = () => call<UsageInfo>('luci.aw1000-modem', 'usageinfo')
+export const smslist = () => call<SmsList>('luci.aw1000-modem', 'smslist')
+export const profileinfo = () => call<ProfileInfo>('luci.aw1000-modem', 'profileinfo')
+export const ipv6info = () => call<Ipv6Info>('luci.aw1000-modem', 'ipv6info')
+export const routerstatus = () => call<RouterStatus>('luci.aw1000-modem', 'routerstatus')
+
+/** One AT command through aw1000-modem-at (takes the shared modem lock). */
+export const atRun = (command: string) =>
+  call<{ ok: boolean; command: string; lines?: string[]; error?: string }>('luci.aw1000-modem', 'atrun', { command })
+
+/**
+ * Band lists are colon-separated band numbers; '-' leaves that group as it
+ * is. `reregister` makes the modem drop and re-attach so the change takes
+ * effect now instead of on the next reconnect.
+ */
+export const setBands = (p: { lte?: number[]; nsa?: number[]; sa?: number[]; gw?: number[]; reregister: boolean }) =>
+  call<{ ok: boolean; error?: string }>('luci.aw1000-modem', 'setbands', {
+    lte: p.lte ? p.lte.join(':') : '-',
+    nsa: p.nsa ? p.nsa.join(':') : '-',
+    sa: p.sa ? p.sa.join(':') : '-',
+    gw: p.gw ? p.gw.join(':') : '-',
+    reregister: p.reregister ? '1' : '0',
+  })
+
+// ---- cells, scan, network mode ----
+
+/**
+ * Sets the whole lock state: `lte` up to cell_lock.lte.max cells, `nr` one
+ * cell (scs in kHz); empty/null unlocks that side. `persist` makes the
+ * router re-apply it at boot. The modem re-searches after a lock write.
+ */
+export const setLock = (lte: LteCellRef[], nr: NrCellRef | null, persist: boolean) =>
+  call<WriteReply<LockInfo>>('luci.aw1000-modem', 'setlock', {
+    lte: lte.map((c) => `${c.arfcn}/${c.pci}`).join(','),
+    nr: nr ? `${nr.arfcn}/${nr.pci}/${nr.band}/${nr.scs}` : '',
+    persist: persist ? '1' : '0',
+  })
+
+/** 1 = LTE, 2 = NR, 3 = both. Data drops for the whole sweep (~90 s). */
+export const scanStart = (mode: 1 | 2 | 3) => call<ScanStatus>('luci.aw1000-modem', 'scanstart', { mode: String(mode) })
+export const scanStatus = () => call<ScanStatus>('luci.aw1000-modem', 'scanstatus')
+export const scanClear = () => call<WriteReply<LockInfo>>('luci.aw1000-modem', 'scanclear')
+
+/**
+ * mode: AUTO | LTE:NR5G | NR5G | LTE; nr5g: 0 SA+NSA, 1 NSA only, 2 SA only.
+ * reregister cycles the radio (CFUN 4/1) when something changed.
+ */
+export const setMode = (mode: string, nr5g: 0 | 1 | 2, reregister: boolean) =>
+  call<WriteReply<LockInfo>>('luci.aw1000-modem', 'setmode', { mode, nr5g: String(nr5g), reregister: reregister ? '1' : '0' })
+
+// ---- SMS ----
+
+export const smsRefresh = () => call<SmsList>('luci.aw1000-modem', 'smsrefresh')
+/** One message: 160 GSM-7 characters or 70 UCS-2 units; no multipart send. */
+export const smsSend = (number: string, text: string) =>
+  call<WriteReply<SmsList>>('luci.aw1000-modem', 'smssend', { number, text })
+/** spec: "ME:3,SM:0" — every part of a multipart message. */
+export const smsDelete = (spec: string[]) => call<WriteReply<SmsList>>('luci.aw1000-modem', 'smsdelete', { spec: spec.join(',') })
+export const smsDeleteAll = (storage: 'ME' | 'SM' | 'all') => call<WriteReply<SmsList>>('luci.aw1000-modem', 'smsdeleteall', { storage })
+export const smsStorage = (storage: 'ME' | 'SM', persist: boolean) =>
+  call<WriteReply<SmsList>>('luci.aw1000-modem', 'smsstorage', { storage, persist: persist ? '1' : '0' })
+
+// ---- APN / TTL ----
+
+/**
+ * mode auto (no APN) | list (a carrier row) | custom. Empty username or
+ * password deletes the stored one. When something changes the uplink
+ * reconnects, and a watchdog restores the old settings if no address
+ * comes up within `apn_verify` seconds: poll profileinfo().verify.state.
+ */
+export const setApn = (p: { mode: string; apn: string; auth: string; username: string; password: string; pdptype: string; carrier: string }) =>
+  call<WriteReply<ProfileInfo>>('luci.aw1000-modem', 'setapn', p)
+/** 1..255 rewrites outgoing TTL/hop limit; 0 turns it off. */
+export const setTtl = (value: number) => call<WriteReply<ProfileInfo>>('luci.aw1000-modem', 'setttl', { value: String(value) })
+
+// ---- data usage (replies are the full usageinfo, with `done`) ----
+
+export const usageSet = (p: {
+  enabled: boolean
+  limit: string
+  unit: string
+  reset_day: number
+  warn_percent: number
+  sms_notify: boolean
+  sms_number: string
+  action: 'none' | 'disconnect'
+  retain_days: number
+}) =>
+  call<UsageInfo & { error?: string }>('luci.aw1000-modem', 'usageset', {
+    enabled: p.enabled ? '1' : '0',
+    limit: p.limit || '0',
+    unit: p.unit,
+    reset_day: String(p.reset_day),
+    warn_percent: String(p.warn_percent),
+    sms_notify: p.sms_notify ? '1' : '0',
+    sms_number: p.sms_number,
+    action: p.action,
+    retain_days: String(p.retain_days),
+  })
+/** period zeroes this billing period; all deletes every recorded day. */
+export const usageReset = (what: 'period' | 'all') => call<UsageInfo & { error?: string }>('luci.aw1000-modem', 'usagereset', { what })
+/** Bring the uplink back after a limit cut it, for the rest of this period. */
+export const usageResume = () => call<UsageInfo & { error?: string }>('luci.aw1000-modem', 'usageresume')

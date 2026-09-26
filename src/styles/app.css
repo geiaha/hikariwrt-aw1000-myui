@@ -1,0 +1,211 @@
+/*
+ * Design tokens from the "Material You" boards on the design canvas.
+ * Colours are Vuetify theme variables (generated from the seed); these are
+ * the type, shape and spacing rules the boards use, as classes.
+ * Unlayered, so they win over Vuetify's layered component styles.
+ */
+
+:root {
+  --v-font-body: 'Figtree', system-ui, sans-serif;
+  --v-font-heading: 'Outfit', 'Figtree', system-ui, sans-serif;
+  --hk-display: 'Outfit', 'Figtree', system-ui, sans-serif;
+  /* Corner radii used by the boards. */
+  --hk-r-hero: 32px;
+  --hk-r-card: 24px;
+  --hk-r-tile: 16px;
+  --hk-r-chip: 8px;
+}
+
+/* Native scrollbars and form controls follow the theme, not the OS. */
+.v-theme--light {
+  color-scheme: light;
+}
+.v-theme--dark {
+  color-scheme: dark;
+}
+/* Themed scrollbars (Firefox and Chromium both honour scrollbar-color). */
+.v-application * {
+  scrollbar-color: rgba(var(--v-theme-on-surface), 0.28) transparent;
+  scrollbar-width: thin;
+}
+
+body,
+.v-application {
+  font-family: var(--v-font-body);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- type ---- */
+
+.hk-overline {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  color: rgb(var(--v-theme-on-surface-muted));
+}
+.hk-h1 {
+  margin: 0;
+  font-family: var(--hk-display);
+  font-weight: 500;
+  font-size: 34px;
+  line-height: 1.2;
+  letter-spacing: -0.2px;
+}
+.hk-h2 {
+  margin: 0;
+  font-family: var(--hk-display);
+  font-weight: 500;
+  font-size: 20px;
+  line-height: 1.3;
+}
+.hk-display {
+  font-family: var(--hk-display);
+  font-weight: 500;
+  line-height: 1;
+}
+.hk-label {
+  font-size: 12px;
+  line-height: 16px;
+  color: rgb(var(--v-theme-on-surface-muted));
+}
+.text-muted {
+  color: rgb(var(--v-theme-on-surface-muted));
+}
+.hk-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- surfaces ---- */
+
+.hk-card {
+  background: rgb(var(--v-theme-surface-container));
+  color: rgb(var(--v-theme-on-surface));
+  border-radius: var(--hk-r-card);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+/* Vuetify inputs are flex: 1 1 auto; placed directly in a column card that
+   stretches them vertically to fill the row height. Only direct children:
+   inputs inside a row (a form or div laid out with d-flex) must keep
+   growing sideways. */
+.hk-card > .v-input {
+  flex: 0 0 auto;
+}
+.hk-tile {
+  background: rgb(var(--v-theme-surface-container-lowest));
+  border-radius: var(--hk-r-tile);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* M3 assist/status chip, 28px, 8px corners. */
+.hk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: var(--hk-r-chip);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.hk-chip--tonal {
+  background: rgb(var(--v-theme-tertiary-container));
+  color: rgb(var(--v-theme-on-tertiary-container));
+  padding-left: 8px;
+}
+.hk-chip--outline {
+  border-color: rgb(var(--v-theme-outline-variant));
+  color: rgb(var(--v-theme-on-surface-muted));
+}
+.hk-chip--filled {
+  background: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-on-primary));
+  font-weight: 700;
+}
+.hk-chip--error {
+  background: rgb(var(--v-theme-error-container));
+  color: rgb(var(--v-theme-on-error-container));
+}
+
+/* Connected list: rows 2px apart, outer corners rounded, inner ones tight. */
+.hk-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hk-group > * {
+  border-radius: 4px;
+}
+.hk-group > :first-child {
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+.hk-group > :last-child {
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+
+/* Text button in the primary colour with a trailing arrow ("Open cellular →"). */
+.hk-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 12px;
+  margin-left: -12px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgb(var(--v-theme-primary));
+  text-decoration: none;
+  align-self: flex-start;
+}
+.hk-link:hover {
+  background: rgba(var(--v-theme-primary), 0.08);
+}
+
+/* Vuetify buttons in the boards' weight. Vuetify 4 gives filled buttons
+   16px labels; every button on the canvas is 14px. */
+.v-btn {
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.v-btn--size-default {
+  font-size: 14px;
+}
+
+.hk-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 1279.98px) {
+  .hk-grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 839.98px) {
+  .hk-grid-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.hk-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

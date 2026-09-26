@@ -1,0 +1,4 @@
+#!/bin/sh
+# Pick up the new ACL file: rpcd reads acl.d only when it starts or reloads.
+/etc/init.d/rpcd reload
+exit 0
