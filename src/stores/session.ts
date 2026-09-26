@@ -5,6 +5,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { call, listObjects, login as ubusLogin, setSession } from '@/api/ubus'
 import { board as fetchBoard, type Board } from '@/api/router'
+import { setupDone as fetchSetupDone } from '@/api/setup'
 import { load, remove, save } from '@/utils/storage'
 
 const KEY = 'hikari.session'
@@ -18,6 +19,14 @@ export const useSession = defineStore('session', () => {
   // feed package the image doesn't include are hidden instead of erroring.
   const objects = ref<Set<string>>(new Set())
   const loggedIn = computed(() => sid.value !== null && board.value !== null)
+  // First run: noPassword is set by the login page when a blank-password
+  // login succeeds (root has no password yet). setupDone mirrors
+  // hikariui.setup.done (null = no such config: treat as done).
+  // setupDismissed is "Set up later" for this session.
+  const noPassword = ref(false)
+  const setupDone = ref<boolean | null>(null)
+  const setupDismissed = ref(false)
+  const needsSetup = computed(() => noPassword.value || (setupDone.value === false && !setupDismissed.value))
 
   setSession(sid.value)
 
@@ -31,8 +40,9 @@ export const useSession = defineStore('session', () => {
   }
 
   async function loadRouter(): Promise<void> {
-    const [b, objs] = await Promise.all([fetchBoard(), listObjects('luci.aw1000-*').catch(() => [])])
+    const [b, objs, done] = await Promise.all([fetchBoard(), listObjects('luci.aw1000-*').catch(() => []), fetchSetupDone()])
     objects.value = new Set(objs)
+    setupDone.value = done
     board.value = b
   }
 
@@ -63,12 +73,23 @@ export const useSession = defineStore('session', () => {
     if (old) await call('session', 'destroy', {}, { sid: old }).catch(() => undefined)
   }
 
+  /** Adopt a session obtained elsewhere (the blank-password first-run login). */
+  async function adopt(newSid: string, user = 'root'): Promise<void> {
+    sid.value = newSid
+    username.value = user
+    setSession(newSid)
+    save(KEY, { sid: newSid, username: user })
+    await loadRouter()
+  }
+
   function forget(): void {
     sid.value = null
     board.value = null
+    noPassword.value = false
+    setupDone.value = null
     setSession(null)
     remove(KEY)
   }
 
-  return { sid, username, board, objects, loggedIn, has, login, restore, logout, forget }
+  return { sid, username, board, objects, loggedIn, noPassword, setupDone, setupDismissed, needsSetup, has, login, adopt, restore, logout, forget }
 })

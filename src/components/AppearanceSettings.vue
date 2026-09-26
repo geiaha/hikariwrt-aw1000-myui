@@ -5,6 +5,8 @@ import { buildTheme, SEED_PRESETS, VARIANTS } from '@/theme/material'
 
 // Seed colour, style, theme and contrast. Swatches show each palette's
 // generated primary (what the UI will actually look like), not the seed.
+// `colorsOnly`: just the swatches and light/dark (the setup wizard's welcome).
+defineProps<{ colorsOnly?: boolean }>()
 const look = useAppearance()
 const swatches = computed(() =>
   SEED_PRESETS.map((p) => ({ ...p, primary: buildTheme({ seed: p.hex, variant: look.variant, contrast: 0 }, false).colors!.primary as string })),
@@ -33,7 +35,7 @@ const swatches = computed(() =>
         </label>
       </div>
     </div>
-    <v-select v-model="look.variant" :items="VARIANTS" label="Style" density="comfortable" hide-details />
+    <v-select v-if="!colorsOnly" v-model="look.variant" :items="VARIANTS" label="Style" density="comfortable" hide-details />
     <div>
       <div class="hk-label mb-2">Theme</div>
       <v-btn-toggle v-model="look.mode" mandatory divided variant="outlined" density="comfortable" class="w-100" rounded="pill">
@@ -42,7 +44,7 @@ const swatches = computed(() =>
         <v-btn value="dark" class="flex-grow-1">Dark</v-btn>
       </v-btn-toggle>
     </div>
-    <div>
+    <div v-if="!colorsOnly">
       <div class="hk-label mb-2">Contrast</div>
       <v-btn-toggle v-model="look.contrast" mandatory divided variant="outlined" density="comfortable" class="w-100" rounded="pill">
         <v-btn :value="0" class="flex-grow-1">Standard</v-btn>

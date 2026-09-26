@@ -13,7 +13,7 @@
 
 export const NULL_SESSION = '00000000000000000000000000000000'
 
-// Absolute: the app is served from /hikari/, but uhttpd mounts ubus at the
+// Absolute: the app is served from /webui/, but uhttpd mounts ubus at the
 // server root.
 const ENDPOINT = '/ubus'
 
@@ -35,11 +35,15 @@ const STATUS_TEXT = [
   'System error',
 ]
 
-// JSON-RPC level error uhttpd returns when the session id is unknown or has
-// expired (rpcd drops idle sessions after their timeout).
+// JSON-RPC level error uhttpd returns both when the session id is unknown or
+// has expired (rpcd drops idle sessions after their timeout) AND when a live
+// session's ACL doesn't allow the call. flush() tells the two apart.
 const ACCESS_DENIED = -32002
 
 export class UbusError extends Error {
+  /** Set by flush() once it has checked the session is really gone. */
+  sessionGone = false
+
   constructor(
     message: string,
     readonly code: number,
@@ -52,7 +56,24 @@ export class UbusError extends Error {
 
   /** The session is gone; the caller should send the user back to login. */
   get expired(): boolean {
-    return this.code === ACCESS_DENIED
+    return this.code === ACCESS_DENIED && this.sessionGone
+  }
+}
+
+// Is this session still alive? session.access with no arguments is allowed
+// for every session (and fails with -32002 only when the session is gone).
+async function sessionAlive(sid: string): Promise<boolean> {
+  try {
+    const res = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 0, method: 'call', params: [sid, 'session', 'access', {}] }),
+    })
+    const j = (await res.json()) as RpcReply
+    return !j.error
+  } catch {
+    // Can't tell (router unreachable): don't sign anyone out over it.
+    return true
   }
 }
 
@@ -111,16 +132,22 @@ function flush(): void {
       if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`)
       const json = (await res.json()) as RpcReply | RpcReply[]
       const replies = new Map((Array.isArray(json) ? json : [json]).map((r) => [r.id, r]))
-      let expired = false
+      const failed: [Pending, UbusError][] = []
       for (const p of batch) {
-        const r = replies.get(p.id)
-        const err = settle(p, r)
-        if (err) {
-          expired ||= err.expired && p.sid !== NULL_SESSION
-          p.reject(err)
-        }
+        const err = settle(p, replies.get(p.id))
+        if (err) failed.push([p, err])
       }
-      if (expired) expiredHandler?.()
+      // An Access denied for a real session: expired, or just not allowed?
+      const denied = failed.find(([p, e]) => e.code === ACCESS_DENIED && p.sid !== NULL_SESSION)
+      const gone = denied ? !(await sessionAlive(denied[0].sid)) : false
+      for (const [p, e] of failed) {
+        if (e.code === ACCESS_DENIED && p.sid !== NULL_SESSION) {
+          if (gone) e.sessionGone = true
+          else e.message = `The router doesn't allow ${p.object}.${p.method} for this login (check the hikari-ui ACL).`
+        }
+        p.reject(e)
+      }
+      if (gone) expiredHandler?.()
     })
     .catch((e: unknown) => {
       for (const p of batch) p.reject(e)

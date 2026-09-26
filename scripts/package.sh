@@ -3,7 +3,7 @@
 set -e
 cd "$(dirname "$0")/.."
 npm run build
-dest=openwrt/hikari-ui/files/www/hikari
+dest=openwrt/hikari-ui/files/www/webui
 rm -rf "$dest"
 mkdir -p "$dest"
 cp -r dist/. "$dest/"

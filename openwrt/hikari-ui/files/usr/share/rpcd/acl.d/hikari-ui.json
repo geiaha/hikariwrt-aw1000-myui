@@ -29,7 +29,8 @@
 					"destroy"
 				],
 				"file": [
-					"read"
+					"read",
+					"exec"
 				],
 				"uci": [
 					"get",
@@ -51,12 +52,24 @@
 					"interfaces"
 				],
 				"luci.aw1000-vpn": [
-					"list"
+					"list",
+					"networks"
 				],
 				"luci.aw1000-storage": [
-					"status"
+					"status",
+					"job"
 				],
 				"luci.aw1000-mesh": [
+					"status",
+					"peers",
+					"radios",
+					"preflight"
+				],
+				"luci": [
+					"getTimezones",
+					"getLocaltime"
+				],
+				"network.device": [
 					"status"
 				]
 			},
@@ -66,15 +79,23 @@
 				],
 				"/var/run/multiwan/status.json": [
 					"read"
+				],
+				"/sbin/logread -l *": [
+					"exec"
 				]
 			},
 			"uci": [
-				"multiwan",
-				"wireless",
 				"adblock",
-				"network",
 				"dhcp",
-				"firewall"
+				"firewall",
+				"hikariui",
+				"multiwan",
+				"network",
+				"system",
+				"wireless"
+			],
+			"cgi-io": [
+				"backup"
 			]
 		},
 		"write": {
@@ -89,7 +110,9 @@
 					"confirm"
 				],
 				"luci": [
-					"setInitAction"
+					"setInitAction",
+					"setLocaltime",
+					"setPassword"
 				],
 				"network.interface": [
 					"up",
@@ -120,19 +143,72 @@
 					"accept"
 				],
 				"luci.aw1000-vpn": [
-					"enable"
+					"enable",
+					"genkey",
+					"import",
+					"create",
+					"remove",
+					"route",
+					"egress"
 				],
 				"hostapd.*": [
 					"del_client"
+				],
+				"luci.aw1000-mesh": [
+					"genkey",
+					"code",
+					"codecheck",
+					"join",
+					"set",
+					"off"
+				],
+				"luci.aw1000-storage": [
+					"mount",
+					"umount",
+					"forget",
+					"eject",
+					"extroot",
+					"format",
+					"settings",
+					"reboot"
+				],
+				"system": [
+					"reboot",
+					"validate_firmware_image"
+				],
+				"rpc-sys": [
+					"upgrade_start",
+					"factory"
+				],
+				"file": [
+					"remove",
+					"exec"
 				]
 			},
 			"uci": [
-				"multiwan",
-				"wireless",
 				"adblock",
-				"network",
 				"dhcp",
-				"firewall"
+				"firewall",
+				"hikariui",
+				"multiwan",
+				"network",
+				"system",
+				"wireless"
+			],
+			"file": {
+				"/tmp/firmware.bin": [
+					"write",
+					"remove"
+				],
+				"/tmp/backup.tar.gz": [
+					"write"
+				],
+				"/sbin/sysupgrade --restore-backup /tmp/backup.tar.gz": [
+					"exec"
+				]
+			},
+			"cgi-io": [
+				"upload"
 			]
 		}
 	}

@@ -7,7 +7,7 @@ export interface Board {
   hostname: string
   model: string
   kernel: string
-  release: { distribution: string; version: string; revision: string; target: string }
+  release: { distribution: string; version: string; revision: string; target: string; description?: string }
 }
 
 export interface SystemInfo {

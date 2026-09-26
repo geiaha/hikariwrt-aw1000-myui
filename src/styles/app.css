@@ -209,3 +209,11 @@ body,
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+/* .hk-link on a <button> (not only <a>). */
+button.hk-link {
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+}

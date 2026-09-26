@@ -9,6 +9,7 @@ import { buildThemes } from '@/theme/material'
 import { useNotify } from '@/composables/notify'
 import ConfirmHost from '@/components/ConfirmHost.vue'
 import SpeedTestDialog from '@/components/SpeedTestDialog.vue'
+import OfflineOverlay from '@/components/OfflineOverlay.vue'
 
 const theme = useTheme()
 const look = useAppearance()
@@ -44,6 +45,7 @@ onSessionExpired(() => {
     <router-view />
     <ConfirmHost />
     <SpeedTestDialog v-if="session.loggedIn" />
+    <OfflineOverlay />
     <v-snackbar v-model="notify.open.value" :timeout="notify.timeout.value" location="bottom">
       {{ notify.text.value }}
     </v-snackbar>

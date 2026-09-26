@@ -21,7 +21,7 @@ placeholder names its phase.
   - OpenWrt package `hikari-ui` with its rpcd ACL;
   - deploy and package scripts;
   - unit tests.
-- **Verified on the router** (`/hikari/`): sign-in, wrong-password message,
+- **Verified on the router** (`/webui/`): sign-in, wrong-password message,
   dashboard data, and that sign-out destroys the session.
 
 ## Design pass ✅ (following the canvas's Material You boards)
@@ -179,12 +179,66 @@ missing options.
   firewall);
 - blocking or disconnecting a real device.
 
-### Still to build
-| Page | Backend |
-|---|---|
-| VPN | `luci.aw1000-vpn` (`list`, `create`, `import`, `enable`, `remove`, `route`, `egress`, `networks`, `genkey`) |
-| Mesh | `luci.aw1000-mesh` (`status`, `peers`, `set`, `join`, `code`, `apply`/`confirm`/`revert`…) |
-| Storage | `luci.aw1000-storage` (`status`, `mount`, `umount`, `eject`, `format`, `extroot`, `job`, `settings`) |
+### VPN ✅
+- **Tunnels** via `luci.aw1000-vpn`:
+  - add by importing a provider's `.conf` (file or paste), or by typing the
+    details (with keypair generation);
+  - on/off, and status from the last handshake;
+  - routing: nobody, selected networks and addresses, or everyone, plus a
+    kill switch;
+  - the uplink to use: follow multi-WAN, or pin to one;
+  - delete.
+- **New tunnels** arrive disabled with routing off.
+
+### Mesh ✅
+- **Status:** role, channel and width, NSS versus software forwarding, linked
+  nodes, and health checks (fails in red, notes neutral).
+- **Off:** choose Main router (name, generated key, radio; it uses the
+  radio's fixed channel) or Extend a mesh (paste a join code, *Check code*
+  lists what joining will change, then Join).
+- **Gateway:** shows and copies the join code, and turns the mesh off.
+- **Satellite:** Leave.
+- **Dumb-AP mode** stays in LuCI, because it changes this router's address and
+  has a boot fuse.
+
+### Storage ✅
+- **Overview:** router storage (internal or USB extroot) and RAM meters,
+  automount and check-before-mount.
+- **Per drive:** eject, and format (filesystem explained by use, type the
+  drive name to confirm).
+- **Per partition:** mount, unmount, forget, use as router storage / back to
+  internal.
+- **Jobs:** a banner while format or extroot runs, and a "Reboot now" prompt
+  when extroot is pending.
+- **The drive the router runs from** can't be ejected or formatted.
+
+## Phase 4: System ✅
+- **Name and time:** router name, time zone (IANA name plus the POSIX
+  string), and setting the clock from the browser.
+- **Admin password:** `luci setPassword`.
+- **Firmware:**
+  1. upload through cgi-upload;
+  2. `system validate_firmware_image`, which refuses images for other boards;
+  3. a keep-settings switch;
+  4. `rpc-sys upgrade_start`.
+- **Backup:** download through cgi-backup. Restore uploads, runs
+  `sysupgrade --restore-backup`, then reboots.
+- **Restart and factory reset**, then an offline overlay that waits for the
+  router to go away and come back, and sends you to sign in (sessions don't
+  survive a reboot).
+- **System log:** `logread -l 300` through rpcd file exec, with a filter and
+  an "only problems" switch.
+- **Appearance** is here too.
+
+AM meters,
+  automount and check-before-mount.
+- **Per drive:** eject, and format (filesystem explained by use, type the
+  drive name to confirm).
+- **Per partition:** mount, unmount, forget, use as router storage / back to
+  internal.
+- **Jobs:** a banner while format or extroot runs, and a "Reboot now" prompt
+  when extroot is pending.
+- **The drive the router runs from** can't be ejected or formatted.
 
 ## Phase 4: System (1–2 sessions)
 
@@ -201,20 +255,3 @@ missing options.
 - **Extras:** NSS status (`luci.aw1000-nss`) and speed test
   (`luci.aw1000-speedtest`).
 
-## Phase 5: polish and ship (about 2 sessions)
-
-- Full pass on phones, dark mode, high contrast, keyboard and screen reader.
-- Bundle review (currently about 190 kB gzipped).
-- Decide the serving path (below), add hikari-ui to the image, and update the
-  READMEs.
-
-## Open decisions
-
-- **Serving path.** Keep `/hikari/`, or make the UI the default at `/` with LuCI
-  at `/cgi-bin/luci`? The latter replaces `/www/index.html` (owned by luci-base)
-  and needs care in packaging.
-- **Languages.** English only for now. If translations are wanted, add vue-i18n
-  before phase 2, so strings aren't retrofitted.
-- **Non-root users.** rpcd login sections can grant limited ACLs; pages would
-  then need to hide controls the session can't write to. Not planned unless
-  asked.

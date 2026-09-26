@@ -8,11 +8,13 @@ export const useUi = defineStore('ui', () => {
   const speedIface = ref<string | null>(null)
   const drawer = ref(false)
   const search = ref(false)
+  /** Set while the router restarts (reboot, upgrade, restore, reset). */
+  const offline = ref<{ title: string; text: string; expectAddress?: string } | null>(null)
 
   function openSpeedTest(iface: string | null = null): void {
     speedIface.value = iface
     speedTest.value = true
   }
 
-  return { speedTest, speedIface, drawer, search, openSpeedTest }
+  return { speedTest, speedIface, drawer, search, offline, openSpeedTest }
 })

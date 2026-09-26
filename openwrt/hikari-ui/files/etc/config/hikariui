@@ -1,0 +1,5 @@
+# HikariWrt web UI. setup.done is set by the first-run wizard when it
+# finishes (and by uci-defaults on routers that already had a password when
+# the package was installed, so they never see the wizard pop up).
+config setup 'setup'
+	option done '0'

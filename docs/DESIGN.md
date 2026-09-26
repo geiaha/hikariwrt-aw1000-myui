@@ -114,6 +114,13 @@ needs its default `theme-on-dark` and `theme-on-light` variables to derive the
   rollback flow.
 - **Firmware row:** "Upgrade" (links to LuCI's flash page), not "Check for
   update": there is no update-check backend yet.
+- **Pages without boards** (Internet, Wireless, Clients, VPN, Mesh, Storage,
+  System, and the Cellular tabs other than Overview) are drawn in the same
+  language: hero in `primary-container` where there's a headline status,
+  `surface-container` cards, connected lists, filter chips, M3 switches, and
+  segmented buttons for modes.
+- **Mesh dumb-AP mode and router mode (IP passthrough)** stay in LuCI. Both
+  change how the router is reached and have their own boot-time safety nets.
 - **Tiles for features that aren't set up** (no WireGuard tunnel, no guest
   network) say "Not set up" and open the relevant page.
 

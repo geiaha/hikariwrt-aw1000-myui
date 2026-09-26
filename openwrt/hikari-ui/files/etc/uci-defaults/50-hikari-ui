@@ -1,4 +1,30 @@
 #!/bin/sh
 # Pick up the new ACL file: rpcd reads acl.d only when it starts or reloads.
-/etc/init.d/rpcd reload
+# On first boot these scripts run before rpcd and uhttpd start, and they
+# read the new config when they do; only a running service needs a reload.
+/etc/init.d/rpcd running && /etc/init.d/rpcd reload
+
+# A router that already has a root password was set up before this package
+# arrived (an upgrade, or LuCI first): don't open the setup wizard on it.
+# A fresh or reset router has an empty hash and gets the wizard.
+hash=$(awk -F: '$1 == "root" { print $2 }' /etc/shadow 2>/dev/null)
+case "$hash" in
+	''|'*'|'!') ;;
+	*) uci -q set hikariui.setup.done='1' && uci -q commit hikariui ;;
+esac
+
+# Make http://<router>/ open the web UI. uhttpd answers a folder request
+# with the first index_page that exists there: webui-index.html exists only
+# in /www, so the site root redirects to /webui/ while every other folder
+# keeps index.html. Setting the list replaces uhttpd's built-in defaults,
+# so those are listed after ours.
+if ! uci -q get uhttpd.main.index_page | grep -qw 'webui-index.html'; then
+	uci -q delete uhttpd.main.index_page
+	for page in webui-index.html index.html index.htm default.html default.htm; do
+		uci -q add_list uhttpd.main.index_page="$page"
+	done
+	uci -q commit uhttpd
+	/etc/init.d/uhttpd running && /etc/init.d/uhttpd reload
+fi
+
 exit 0

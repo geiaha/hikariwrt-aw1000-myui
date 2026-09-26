@@ -1,0 +1,336 @@
+// The setup wizard's state: what the router has now, what you've chosen,
+// whether each step is valid, and the ordered apply. Nothing touches the
+// router until apply(); leaving the wizard midway changes nothing.
+//
+// Apply order is chosen so the browser keeps its connection as long as
+// possible: password, name/time, WAN, APN and the "setup done" flag all
+// leave LAN and Wi-Fi alone, and Wi-Fi goes last with applyNow() (not
+// rollback) because changing the SSID/key of the network this browser is on
+// disconnects it, which would make a rollback always fire.
+
+import { computed, reactive, ref } from 'vue'
+import * as uci from '@/api/uci'
+import * as sys from '@/api/system'
+import * as modem from '@/api/modem'
+import { saveWan, wanConfig, type WanConfig } from '@/api/wan'
+import { wifiRadios, type WifiRadio } from '@/api/wifi'
+import { markSetupDone, wanCarrier } from '@/api/setup'
+import { useSession } from '@/stores/session'
+import { dnsError, ipError, keyError, mtuError, netmaskError, parseList, ssidError } from '@/utils/validate'
+
+export type StepId = 'welcome' | 'password' | 'system' | 'internet' | 'wifi' | 'review'
+export const STEPS: { id: StepId; title: string; lead: string }[] = [
+  { id: 'welcome', title: 'Welcome', lead: 'A few minutes to get your router ready. Nothing changes until the last step.' },
+  { id: 'password', title: 'Admin password', lead: 'Protects these settings. You’ll use it to sign in here, in LuCI and over SSH.' },
+  { id: 'system', title: 'Name and time', lead: 'What the router is called on your network, and where it is.' },
+  { id: 'internet', title: 'Internet', lead: 'How the router connects: a cable from your ISP, the 5G SIM, or both.' },
+  { id: 'wifi', title: 'Wi-Fi', lead: 'The network your devices join.' },
+  { id: 'review', title: 'Review', lead: 'Check everything, then set it up.' },
+]
+
+export type TaskState = 'pending' | 'running' | 'done' | 'failed'
+export interface Task {
+  id: string
+  label: string
+  state: TaskState
+  error?: string
+  run: () => Promise<unknown>
+}
+
+interface ApnForm {
+  mode: 'auto' | 'list' | 'custom'
+  carrier: string
+  apn: string
+  auth: string
+  username: string
+  password: string
+  pdptype: string
+}
+
+interface BandForm {
+  section: string
+  band: string
+  ssid: string
+  key: string
+  encryption: string
+}
+
+export function useSetup() {
+  const session = useSession()
+  const hasModem = computed(() => session.has('luci.aw1000-modem'))
+
+  const loading = ref(true)
+  const loadError = ref('')
+
+  // ---- current state (for defaults and "changed") ----
+  const orig = reactive({
+    system: null as sys.SystemSettings | null,
+    wan: null as WanConfig | null,
+    radios: [] as WifiRadio[],
+    profile: null as modem.ProfileInfo | null,
+    modem: null as modem.ModemStatus | null,
+  })
+  const zones = ref<Record<string, { tzstring: string }>>({})
+  const carrier = ref<boolean | null>(null)
+
+  // ---- the draft ----
+  const draft = reactive({
+    password: { a: '', b: '' },
+    system: { hostname: '', zonename: '' },
+    wan: { proto: 'dhcp', username: '', password: '', ipaddr: '', netmask: '255.255.255.0', gateway: '', dns: '', mtu: '', ipv6: true },
+    apn: { mode: 'auto', carrier: '', apn: '', auth: 'none', username: '', password: '', pdptype: '' } as ApnForm,
+    wifi: { same: true, ssid: '', key: '', encryption: 'sae-mixed', bands: [] as BandForm[] },
+  })
+
+  async function load(): Promise<void> {
+    loading.value = true
+    try {
+      const [s, z, w, r, p, m, c] = await Promise.all([
+        sys.systemSettings().catch(() => null),
+        sys.timezones().catch(() => ({})),
+        wanConfig(),
+        wifiRadios().catch(() => []),
+        hasModem.value ? modem.profileinfo().catch(() => null) : Promise.resolve(null),
+        hasModem.value ? modem.status().catch(() => null) : Promise.resolve(null),
+        wanCarrier(),
+      ])
+      Object.assign(orig, { system: s, wan: w, radios: r, profile: p?.ok ? p : null, modem: m })
+      zones.value = z
+      carrier.value = c
+
+      fill('system')
+      fill('internet')
+      fill('wifi')
+      loadError.value = ''
+    } catch (e) {
+      loadError.value = e instanceof Error ? e.message : String(e)
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /** Put one step's draft back to what the router has (defaults on load, Skip). */
+  function fill(step: StepId): void {
+    const o = orig
+    if (step === 'password') Object.assign(draft.password, { a: '', b: '' })
+    if (step === 'system') {
+      // A router still on the factory default (UTC) gets this browser's zone.
+      const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+      draft.system.hostname = o.system?.hostname ?? 'HikariWrt'
+      draft.system.zonename =
+        o.system && o.system.zonename !== 'UTC' ? o.system.zonename : browserZone in zones.value ? browserZone : (o.system?.zonename ?? 'UTC')
+    }
+    if (step === 'internet') {
+      if (o.wan) Object.assign(draft.wan, { ...o.wan, dns: o.wan.dns.join(', ') })
+      const a = o.profile?.apn
+      if (a) {
+        Object.assign(draft.apn, {
+          mode: a.mode === 'list' || a.mode === 'custom' ? a.mode : 'auto',
+          carrier: a.carrier,
+          apn: a.value,
+          auth: a.auth || 'none',
+          username: a.username,
+          password: '',
+          pdptype: a.pdptype || '',
+        })
+      }
+    }
+    if (step === 'wifi') {
+      const aps = o.radios.flatMap((radio) => radio.networks.filter((n) => !n.guest).map((n) => ({ radio, n })))
+      draft.wifi.bands = aps.map(({ radio, n }) => ({
+        section: n.section,
+        band: radio.band,
+        ssid: n.ssid,
+        key: n.key,
+        encryption: n.encryption === 'none' ? 'sae-mixed' : n.encryption,
+      }))
+      const first = draft.wifi.bands[0]
+      draft.wifi.same = new Set(draft.wifi.bands.map((b) => `${b.ssid}\n${b.key}`)).size <= 1
+      if (first) Object.assign(draft.wifi, { ssid: first.ssid, key: first.key, encryption: first.encryption })
+    }
+  }
+
+  // ---- validation per step ----
+  const passwordErrors = computed(() => {
+    const { a, b } = draft.password
+    if (!a && !b) return session.noPassword ? { a: 'Choose a password', b: null } : { a: null, b: null }
+    return { a: a.length < 8 ? 'At least 8 characters' : null, b: b && a !== b ? 'The two don’t match' : !b ? 'Type it again' : null }
+  })
+
+  const wanErrors = computed(() => {
+    const w = draft.wan
+    return {
+      username: w.proto === 'pppoe' && !w.username.trim() ? 'Required' : null,
+      ipaddr: w.proto === 'static' ? ipError(w.ipaddr) : null,
+      netmask: w.proto === 'static' ? netmaskError(w.netmask) : null,
+      gateway: w.proto === 'static' ? ipError(w.gateway) : null,
+      dns: w.dns.trim() ? dnsError(w.dns) : w.proto === 'static' ? 'Static needs a DNS server' : null,
+      mtu: mtuError(w.mtu),
+    }
+  })
+  const apnError = computed(() => {
+    const a = draft.apn
+    if (!hasModem.value || a.mode === 'auto') return null
+    if (a.mode === 'list') return a.carrier ? null : 'Pick your carrier'
+    return /^[A-Za-z0-9._-]+$/.test(a.apn.trim()) ? null : 'Letters, digits, dots, dashes and underscores'
+  })
+
+  const wifiErrors = computed(() => {
+    const w = draft.wifi
+    if (w.same) return { ssid: ssidError(w.ssid), key: keyError(w.key, w.encryption), bands: [] as { ssid: string | null; key: string | null }[] }
+    return { ssid: null, key: null, bands: w.bands.map((b) => ({ ssid: ssidError(b.ssid), key: keyError(b.key, b.encryption) })) }
+  })
+
+  const valid = computed<Record<StepId, boolean>>(() => ({
+    welcome: true,
+    password: !passwordErrors.value.a && !passwordErrors.value.b,
+    system: /^[A-Za-z0-9][A-Za-z0-9-]{0,62}$/.test(draft.system.hostname) && draft.system.zonename in zones.value,
+    internet: Object.values(wanErrors.value).every((e) => !e) && !apnError.value,
+    wifi: !wifiErrors.value.ssid && !wifiErrors.value.key && wifiErrors.value.bands.every((b) => !b.ssid && !b.key),
+    review: true,
+  }))
+
+  // ---- what will change ----
+  const wanNext = computed<WanConfig>(() => ({
+    proto: draft.wan.proto,
+    username: draft.wan.username.trim(),
+    password: draft.wan.password,
+    ipaddr: draft.wan.ipaddr.trim(),
+    netmask: draft.wan.netmask.trim(),
+    gateway: draft.wan.gateway.trim(),
+    dns: parseList(draft.wan.dns),
+    mtu: draft.wan.mtu.trim(),
+    ipv6: draft.wan.ipv6,
+  }))
+  const wifiNext = computed<BandForm[]>(() =>
+    draft.wifi.same ? draft.wifi.bands.map((b) => ({ ...b, ssid: draft.wifi.ssid, key: draft.wifi.key, encryption: draft.wifi.encryption })) : draft.wifi.bands,
+  )
+
+  const changes = computed(() => {
+    const o = orig
+    const wan = o.wan && JSON.stringify(wanNext.value) !== JSON.stringify(o.wan)
+    const a = o.profile?.apn
+    const apn =
+      hasModem.value &&
+      !!a &&
+      (draft.apn.mode !== (a.mode === 'list' || a.mode === 'custom' ? a.mode : 'auto') ||
+        (draft.apn.mode === 'list' && draft.apn.carrier !== a.carrier) ||
+        (draft.apn.mode === 'custom' && (draft.apn.apn.trim() !== a.value || draft.apn.auth !== (a.auth || 'none') || draft.apn.username !== a.username || !!draft.apn.password || draft.apn.pdptype !== (a.pdptype || ''))))
+    const wifi = wifiNext.value.some((b) => {
+      const n = o.radios.flatMap((r) => r.networks).find((x) => x.section === b.section)
+      return !n || n.ssid !== b.ssid || n.key !== b.key || n.encryption !== b.encryption
+    })
+    return {
+      password: !!draft.password.a,
+      system: !!o.system && (draft.system.hostname !== o.system.hostname || draft.system.zonename !== o.system.zonename),
+      wan: !!wan,
+      apn,
+      wifi,
+    }
+  })
+
+  // ---- apply ----
+  const tasks = ref<Task[]>([])
+  const applying = ref(false)
+  const finished = ref(false)
+
+  function buildTasks(): Task[] {
+    const c = changes.value
+    const t: Task[] = []
+    if (c.password) t.push({ id: 'password', label: 'Set the admin password', state: 'pending', run: () => sys.setPassword(draft.password.a) })
+    if (c.system && orig.system) {
+      const s = orig.system
+      t.push({
+        id: 'system',
+        label: 'Name the router and set its time zone',
+        state: 'pending',
+        run: () => sys.saveSystem(s.section, draft.system.hostname, draft.system.zonename, zones.value[draft.system.zonename]?.tzstring ?? 'UTC0'),
+      })
+    }
+    if (c.wan) t.push({ id: 'wan', label: 'Connect the wired internet', state: 'pending', run: () => saveWan(wanNext.value) })
+    if (c.apn) {
+      const a = draft.apn
+      const row = orig.profile?.carriers?.find((x) => x.id === a.carrier)
+      const args =
+        a.mode === 'auto'
+          ? { mode: 'auto', apn: '', auth: 'none', username: '', password: '', pdptype: '', carrier: '' }
+          : a.mode === 'list' && row
+            ? { mode: 'list', apn: row.apn, auth: row.auth || 'none', username: row.username ?? '', password: row.password ?? '', pdptype: row.pdptype ?? '', carrier: row.id }
+            : { mode: 'custom', apn: a.apn.trim(), auth: a.auth, username: a.username.trim(), password: a.password, pdptype: a.pdptype, carrier: '' }
+      t.push({
+        id: 'apn',
+        label: 'Set up the 5G connection',
+        state: 'pending',
+        run: async () => {
+          const r = await modem.setApn(args)
+          if (!r.ok) throw new Error(r.error || 'The modem refused the APN.')
+        },
+      })
+    }
+    t.push({ id: 'done', label: 'Remember that setup is finished', state: 'pending', run: () => markSetupDone() })
+    if (c.wifi) {
+      t.push({
+        id: 'wifi',
+        label: 'Restart Wi-Fi with the new name and password',
+        state: 'pending',
+        run: async () => {
+          for (const b of wifiNext.value) await uci.set('wireless', b.section, { ssid: b.ssid, key: b.key, encryption: b.encryption })
+          // If this browser is on the Wi-Fi being changed, the reply may never
+          // arrive: the router got the request, the connection just dropped.
+          await Promise.race([uci.applyNow().catch(() => undefined), new Promise((r) => setTimeout(r, 8000))])
+        },
+      })
+    }
+    return t
+  }
+
+  async function apply(from = 0): Promise<void> {
+    if (!from) tasks.value = buildTasks()
+    applying.value = true
+    for (let i = from; i < tasks.value.length; i++) {
+      const task = tasks.value[i]!
+      task.state = 'running'
+      task.error = undefined
+      try {
+        await task.run()
+        task.state = 'done'
+      } catch (e) {
+        task.state = 'failed'
+        task.error = e instanceof Error ? e.message : String(e)
+        if (task.id === 'wifi') await uci.revert('wireless').catch(() => undefined)
+        applying.value = false
+        return
+      }
+    }
+    applying.value = false
+    finished.value = true
+    session.noPassword = false
+    session.setupDone = true
+  }
+
+  const retry = () => apply(tasks.value.findIndex((t) => t.state === 'failed'))
+
+  return {
+    loading, loadError, load, fill, orig, zones, carrier, hasModem, draft,
+    passwordErrors, wanErrors, apnError, wifiErrors, valid, changes, wifiNext,
+    tasks, applying, finished, apply, retry,
+  }
+}
+
+export type SetupState = ReturnType<typeof useSetup>
+
+/** For the Done screen: the network devices should rejoin. */
+export function primaryNetwork(s: SetupState): { ssid: string; key: string; encryption: string } | null {
+  const b = s.wifiNext.value.find((x) => x.band === '5g') ?? s.wifiNext.value[0]
+  return b ? { ssid: b.ssid, key: b.key, encryption: b.encryption } : null
+}
+
+/** The router's LAN address, for "open http://…/webui/". */
+export async function lanAddress(): Promise<string> {
+  try {
+    const s = await uci.getSection('network', 'lan')
+    return String(s.ipaddr ?? '192.168.1.1').split('/')[0]!
+  } catch {
+    return window.location.hostname
+  }
+}

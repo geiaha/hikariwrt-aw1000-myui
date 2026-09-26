@@ -24,6 +24,10 @@ what comes next.
 - **ACL.** Every new ubus call must be allowed in
   `openwrt/hikari-ui/files/usr/share/rpcd/acl.d/hikari-ui.json`, unless an
   installed `luci-app-aw1000-*` ACL group already grants it.
+- **ACL denials look like expiry.** uhttpd returns `-32002` for both;
+  `ubus.ts` tells them apart. A new call missing from the ACL therefore fails
+  with a clear message rather than signing the user out, but still add it to
+  the ACL.
 - **The AT port is shared and slow.** Never poll anything that sends AT
   commands. Poll only cached status; refreshes and scans are user actions.
 - **Settings that can cut off access** (LAN, Wi-Fi, firewall) use
@@ -63,5 +67,5 @@ what comes next.
    in these sessions) for `[Vue warn]` and unhandled rejections: Vue catches
    component errors, so a page can half-render with no window error.
 4. Before calling a page done, deploy it and test it at
-   `http://192.168.88.1/hikari/`. The dev server hides path bugs; for example,
+   `http://192.168.88.1/webui/`. The dev server hides path bugs; for example,
    the ubus endpoint must be absolute.

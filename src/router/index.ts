@@ -3,7 +3,7 @@ import { NAV } from '@/nav'
 import { useSession } from '@/stores/session'
 
 // Hash history: uhttpd serves plain files and has no SPA fallback, so
-// /hikari/#/cellular survives a reload where /hikari/cellular would 404.
+// /webui/#/cellular survives a reload where /webui/cellular would 404.
 
 // Pages that exist; everything else in NAV gets the placeholder.
 const BUILT: Record<string, () => Promise<unknown>> = {
@@ -12,6 +12,10 @@ const BUILT: Record<string, () => Promise<unknown>> = {
   internet: () => import('@/views/InternetView.vue'),
   wifi: () => import('@/views/WirelessView.vue'),
   clients: () => import('@/views/ClientsView.vue'),
+  vpn: () => import('@/views/VpnView.vue'),
+  mesh: () => import('@/views/MeshView.vue'),
+  storage: () => import('@/views/StorageView.vue'),
+  system: () => import('@/views/SystemView.vue'),
 }
 
 const pages: RouteRecordRaw[] = NAV.map((n) => ({
@@ -26,6 +30,8 @@ const router = createRouter({
   history: createWebHashHistory(),
   routes: [
     { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { public: true } },
+    // Full screen, outside the app shell: first-run setup comes before anything else.
+    { path: '/setup', name: 'setup', component: () => import('@/views/SetupView.vue'), meta: { title: 'Set up' } },
     { path: '/', component: () => import('@/layouts/AppShell.vue'), children: pages },
     { path: '/:rest(.*)*', redirect: '/' },
   ],
@@ -40,6 +46,9 @@ router.beforeEach(async (to) => {
   }
   if (to.meta.public) return session.loggedIn ? { path: '/' } : true
   if (!session.loggedIn) return { name: 'login', query: to.fullPath !== '/' ? { next: to.fullPath } : {} }
+  // A router with no password, or not set up yet (and not "later" this
+  // session), goes to the wizard first.
+  if (session.needsSetup && to.name !== 'setup') return { name: 'setup' }
   return true
 })
 

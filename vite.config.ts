@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     // Relative base: the same build works wherever uhttpd serves it
-    // (/hikari/ today, possibly / later) without a rebuild.
+    // (/webui/ today, possibly / later) without a rebuild.
     base: './',
     plugins: [vue(), vuetify({ autoImport: true })],
     resolve: {

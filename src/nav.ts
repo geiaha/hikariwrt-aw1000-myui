@@ -27,13 +27,13 @@ export const NAV: NavItem[] = [
   { name: 'cellular', path: '/cellular', title: 'Cellular', icon: 'cellular', primary: true, phase: 0, luci: 'admin/modem/status', requires: 'luci.aw1000-modem', keywords: '5g lte modem signal sim' },
   { name: 'wifi', path: '/wifi', title: 'Wireless', icon: 'wifi', phase: 0, luci: 'admin/network/wireless', keywords: 'wi-fi wifi ssid password 5 ghz 2.4 ghz guest' },
   { name: 'clients', path: '/clients', title: 'Clients', icon: 'clients', primary: true, phase: 0, luci: 'admin/network/dhcp', keywords: 'devices dhcp leases' },
-  { name: 'vpn', path: '/vpn', title: 'VPN', icon: 'vpn', phase: 3, luci: 'admin/vpn/wireguard', requires: 'luci.aw1000-vpn', keywords: 'wireguard tunnel' },
-  { name: 'mesh', path: '/mesh', title: 'Mesh', icon: 'mesh', phase: 3, luci: 'admin/network/mesh', requires: 'luci.aw1000-mesh', keywords: '802.11s backhaul' },
-  { name: 'storage', path: '/storage', title: 'Storage', icon: 'storage', phase: 3, luci: 'admin/system/storage', requires: 'luci.aw1000-storage', keywords: 'usb drive disk extroot' },
-  { name: 'system', path: '/system', title: 'System', icon: 'system', phase: 4, luci: 'admin/system/system', keywords: 'firmware upgrade backup password reboot time' },
+  { name: 'vpn', path: '/vpn', title: 'VPN', icon: 'vpn', phase: 0, luci: 'admin/vpn/wireguard', requires: 'luci.aw1000-vpn', keywords: 'wireguard tunnel' },
+  { name: 'mesh', path: '/mesh', title: 'Mesh', icon: 'mesh', phase: 0, luci: 'admin/network/mesh', requires: 'luci.aw1000-mesh', keywords: '802.11s backhaul' },
+  { name: 'storage', path: '/storage', title: 'Storage', icon: 'storage', phase: 0, luci: 'admin/system/storage', requires: 'luci.aw1000-storage', keywords: 'usb drive disk extroot' },
+  { name: 'system', path: '/system', title: 'System', icon: 'system', phase: 0, luci: 'admin/system/system', keywords: 'firmware upgrade backup password reboot time' },
 ]
 
-/** Full LuCI URL (absolute: this UI lives under /hikari/). */
+/** Full LuCI URL (absolute: this UI lives under /webui/). */
 export function luciUrl(path = ''): string {
   return `/cgi-bin/luci/${path}`
 }
