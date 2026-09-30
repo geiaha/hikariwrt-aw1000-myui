@@ -90,7 +90,15 @@ async function start(): Promise<void> {
 .hk-fs__opt.on .hk-label {
   color: inherit;
 }
+/* Vuetify's selection control grows (flex: 1 0); with no label of its own
+   it took the row's spare width, so the shorter a description the further
+   right its text started. The radio keeps its size, the text takes the rest. */
+.hk-fs__opt > .v-radio {
+  flex: 0 0 auto;
+}
 .hk-fs__opt > span {
+  flex: 1 1 auto;
+  min-width: 0;
   padding-top: 10px;
 }
 </style>
