@@ -122,3 +122,22 @@ export async function saveWifi(c: WifiChange, safe: boolean): Promise<void> {
   if (safe) await uci.applyWithRollback(30)
   else await uci.applyNow()
 }
+
+/**
+ * One name and password on several bands ("same name on both bands"): the
+ * same values and removals staged on every section, then applied once, so
+ * the bands never sit on different settings between two applies.
+ */
+export async function saveWifiShared(sections: string[], values: Record<string, string>, drop: string[], safe: boolean): Promise<void> {
+  try {
+    for (const s of sections) {
+      await uci.set('wireless', s, values)
+      await uci.del('wireless', s, drop)
+    }
+  } catch (e) {
+    await uci.revert('wireless').catch(() => undefined)
+    throw e
+  }
+  if (safe) await uci.applyWithRollback(30)
+  else await uci.applyNow()
+}

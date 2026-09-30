@@ -132,3 +132,24 @@ export function smsLength(text: string): SmsLength {
   }
   return { encoding: 'GSM-7', used: septets, max: 160, fits: septets <= 160 }
 }
+
+/** The PLMN the modem is registered on ("51502"), or null before it knows. */
+export function homePlmn(mcc: string | null | undefined, mnc: string | null | undefined): string | null {
+  return mcc && mnc ? `${mcc}${mnc}` : null
+}
+
+/**
+ * A cell on another operator's network. A scan hears every operator in
+ * range, and most of those cells are no use to lock to. A cell without a
+ * PLMN is never foreign: neighbour lines and aggregated carriers carry none,
+ * and both belong to the network the modem is already on. With no home PLMN
+ * yet (not registered), nothing is foreign - there is nothing to compare to.
+ */
+export function isForeignCell(cell: { plmn: string | null }, home: string | null): boolean {
+  return !!(home && cell.plmn && String(cell.plmn) !== home)
+}
+
+/** "51566" -> "515-66", how a PLMN is written everywhere else. */
+export function plmnLabel(plmn: string): string {
+  return plmn.length >= 5 ? `${plmn.slice(0, 3)}-${plmn.slice(3)}` : plmn
+}

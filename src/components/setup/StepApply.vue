@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import HkIcon from '@/components/icons/HkIcon.vue'
-import WifiQr from './WifiQr.vue'
+import WifiJoin from '@/components/wifi/WifiJoin.vue'
 import { lanAddress, primaryNetwork, type SetupState } from '@/composables/setup'
 
 // The task list while setting up, then "all set". The Wi-Fi details and QR
@@ -17,7 +17,6 @@ const net = computed(() => primaryNetwork(props.s))
 const wifiTask = computed(() => props.s.tasks.value.find((t) => t.id === 'wifi') ?? null)
 const showJoin = computed(() => props.s.finished.value || (wifiTask.value && wifiTask.value.state !== 'pending'))
 const failed = computed(() => props.s.tasks.value.find((t) => t.state === 'failed') ?? null)
-const reveal = ref(false)
 </script>
 
 <template>
@@ -40,21 +39,9 @@ const reveal = ref(false)
     <v-btn variant="text" color="primary" height="40" @click="emit('back')">Back to review</v-btn>
   </div>
 
-  <div v-if="showJoin && net && s.changes.value.wifi" class="hk-join">
-    <WifiQr :ssid="net.ssid" :password="net.key" :encryption="net.encryption" :size="176" />
-    <div class="d-flex flex-column ga-2" style="min-width: 0">
-      <span class="hk-h2" style="font-size: 18px">Join your new Wi-Fi</span>
-      <span class="hk-label">Scan with a phone camera, or pick the network and type the password.</span>
-      <span class="hk-join__name">{{ net.ssid }}</span>
-      <div class="d-flex align-center ga-2">
-        <span class="hk-join__key">{{ reveal ? net.key : '•'.repeat(Math.min(net.key.length, 16)) }}</span>
-        <v-btn variant="text" size="small" :aria-label="reveal ? 'Hide password' : 'Show password'" @click="reveal = !reveal">
-          <HkIcon :name="reveal ? 'eyeOff' : 'eye'" :size="18" class="mr-1" />{{ reveal ? 'Hide' : 'Show' }}
-        </v-btn>
-      </div>
-      <span class="hk-label">Then open <b>http://{{ lan || '192.168.88.1' }}/webui/</b> to come back here.</span>
-    </div>
-  </div>
+  <WifiJoin v-if="showJoin && net && s.changes.value.wifi" :ssid="net.ssid" :password="net.key" :encryption="net.encryption" title="Join your new Wi-Fi">
+    <span class="hk-label">Then open <b>http://{{ lan || '192.168.88.1' }}/webui/</b> to come back here.</span>
+  </WifiJoin>
 
   <template v-if="s.finished.value">
     <div class="hk-next">
@@ -123,39 +110,6 @@ const reveal = ref(false)
   border-color: rgb(var(--v-theme-error));
   background: rgb(var(--v-theme-error));
   color: rgb(var(--v-theme-on-error));
-}
-.hk-join {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 20px;
-  border-radius: 24px;
-  background: rgb(var(--v-theme-primary-container));
-  color: rgb(var(--v-theme-on-primary-container));
-}
-.hk-join .hk-label {
-  color: inherit;
-  opacity: 0.85;
-}
-.hk-join__key {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 16px;
-  overflow-wrap: anywhere;
-}
-.hk-join__name {
-  font-family: var(--hk-display);
-  font-size: 26px;
-  font-weight: 500;
-  overflow-wrap: anywhere;
-}
-@media (max-width: 599.98px) {
-  .hk-join {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .hk-join :deep(.hk-qr) {
-    align-self: center;
-  }
 }
 .hk-next {
   display: flex;

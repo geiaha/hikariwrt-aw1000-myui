@@ -44,6 +44,9 @@ export interface ModemStatus {
   spn?: string | null
   network_name?: string | null
   roaming_abroad?: boolean
+  /** The network the modem is registered on, as strings ("515", "02"). */
+  mcc?: string | null
+  mnc?: string | null
   tac?: string
   gnb_id_bits?: number
   error?: string | null

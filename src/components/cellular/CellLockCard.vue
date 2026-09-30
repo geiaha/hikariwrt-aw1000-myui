@@ -8,13 +8,20 @@ import type { KnownCell, LockInfo } from '@/api/modem'
 import { useAction } from '@/composables/action'
 import { useConfirm } from '@/composables/confirm'
 import { signed } from '@/utils/format'
+import { isForeignCell, plmnLabel } from '@/utils/cellular'
 
 // Cell lock: pick cells the modem has seen (serving, carrier aggregation,
 // neighbours, and anything a scan found) and pin the modem to them.
 // One 5G cell at most; LTE up to the modem's limit. A scan drops data for
 // the whole sweep and can't be stopped, so it asks first and is watched
 // with a 5 s poll only while it runs.
-const props = defineProps<{ lock: LockInfo | null }>()
+//
+// Only cells on the operator the modem is registered on are listed: a scan
+// hears every network in range, and locking to another operator's cell
+// leaves the modem with no service. Those are one tap away for the rare
+// SIM that can use them (national roaming), and a cell that is part of the
+// current lock always stays listed, so it can be unlocked.
+const props = defineProps<{ lock: LockInfo | null; home: string | null }>()
 const emit = defineEmits<{ changed: [state?: LockInfo] }>()
 const { busy, run } = useAction()
 const { ask } = useConfirm()
@@ -43,8 +50,13 @@ watch(
   { immediate: true },
 )
 
-const cells = computed(() =>
+const allCells = computed(() =>
   [...(props.lock?.cells ?? [])].sort((a, b) => (b.rsrp ?? -200) - (a.rsrp ?? -200)),
+)
+const showForeign = ref(false)
+const foreignCount = computed(() => allCells.value.filter((c) => isForeignCell(c, props.home)).length)
+const cells = computed(() =>
+  allCells.value.filter((c) => showForeign.value || !isForeignCell(c, props.home) || picked.value.has(key(c, c.tech))),
 )
 const SOURCE: Record<KnownCell['source'], string> = { serving: 'Serving', ca: 'Carrier aggregation', neighbour: 'Neighbour', scan: 'From scan' }
 
@@ -138,7 +150,7 @@ const scanPct = computed(() => {
   const s = scan.value
   return s?.running && s.elapsed != null ? Math.min(99, (s.elapsed / 90) * 100) : 0
 })
-const hasScanRows = computed(() => cells.value.some((c) => c.source === 'scan'))
+const hasScanRows = computed(() => allCells.value.some((c) => c.source === 'scan'))
 </script>
 
 <template>
@@ -175,10 +187,14 @@ const hasScanRows = computed(() => cells.value.some((c) => c.source === 'scan'))
         <span class="hk-cell__main">
           <span class="font-weight-bold">{{ c.tech === 'NR' ? '5G' : 'LTE' }} · {{ c.band != null ? (c.tech === 'NR' ? `n${c.band}` : `B${c.band}`) : 'band ?' }}</span>
           <span class="hk-label">PCI {{ c.pci }} · {{ c.tech === 'NR' ? 'ARFCN' : 'EARFCN' }} {{ c.arfcn }}<template v-if="c.bandwidth"> · {{ c.bandwidth }} MHz</template> · {{ SOURCE[c.source] }}</span>
+          <span v-if="isForeignCell(c, home)" class="hk-label text-error">Another operator’s network ({{ plmnLabel(c.plmn!) }})</span>
         </span>
         <span class="hk-cell__sig hk-num">{{ signed(c.rsrp) }} dBm</span>
       </label>
-      <p v-if="!cells.length" class="text-muted">No cells seen yet. A scan lists what's around.</p>
+      <p v-if="!cells.length" class="text-muted">{{ foreignCount ? 'No cells on your operator’s network seen yet. A scan lists what’s around.' : 'No cells seen yet. A scan lists what’s around.' }}</p>
+      <button v-if="foreignCount" type="button" class="hk-link" @click="showForeign = !showForeign">
+        {{ showForeign ? 'Hide other operators’ cells' : `Also show ${foreignCount} ${foreignCount === 1 ? 'cell' : 'cells'} on other operators’ networks` }}
+      </button>
     </div>
     <v-skeleton-loader v-else type="list-item-two-line@2" bg-color="transparent" />
 

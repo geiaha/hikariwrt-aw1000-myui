@@ -18,7 +18,7 @@ import { reconnect } from '@/api/services'
 import { usePoll } from '@/composables/poll'
 import { useAction } from '@/composables/action'
 import { useConfirm } from '@/composables/confirm'
-import { shortRevision } from '@/utils/cellular'
+import { shortRevision, homePlmn } from '@/utils/cellular'
 
 // Cellular, as on the design canvas. Loading follows the AT-port rule:
 //   polled every 5 s:       status (cached by aw1000-modem-info)
@@ -153,7 +153,7 @@ async function doReconnect(): Promise<void> {
     </div>
   </div>
 
-  <LockTab v-else-if="tab.id === 'lock'" :lock="lock" @state="onLockState" />
+  <LockTab v-else-if="tab.id === 'lock'" :lock="lock" :home="homePlmn(status.data.value?.mcc, status.data.value?.mnc)" @state="onLockState" />
   <SmsTab v-else-if="tab.id === 'sms'" />
   <ApnTab v-else-if="tab.id === 'apn'" />
   <UsageTab v-else-if="tab.id === 'usage'" />

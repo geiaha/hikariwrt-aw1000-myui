@@ -1,13 +1,23 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
+import M3Switch from '@/components/m3/M3Switch.vue'
 import BandCard from '@/components/wifi/BandCard.vue'
 import GuestCard from '@/components/wifi/GuestCard.vue'
+import SharedWifiCard from '@/components/wifi/SharedWifiCard.vue'
+import WifiJoin from '@/components/wifi/WifiJoin.vue'
 import { wifiRadios, type WifiRadio } from '@/api/wifi'
 import { guestState, type GuestState } from '@/api/guest'
 
 // Wireless: one card per band. Loaded on open and after each save (not
 // polled: a refresh while you type would overwrite the form).
+//
+// "Same name on both bands" isn't a setting of its own - the setup wizard
+// writes the same name, password and security to every band - so it is read
+// back the same way: all main networks alike means shared. Then one Wi-Fi
+// card holds the name and password, and the band cards keep only channel,
+// width and on/off. The switch splits them again (or joins them), and the
+// choice only reaches the router when a card is saved.
 const radios = ref<WifiRadio[] | null>(null)
 const gstate = ref<GuestState | null>(null)
 const error = ref('')
@@ -33,8 +43,19 @@ const bands = computed(() =>
 const guest = computed(() => (radios.value ?? []).flatMap((r) => r.networks.filter((n) => n.guest).map((n) => ({ radio: r, net: n }))))
 const devices = computed(() => bands.value.reduce((a, b) => a + b.net.clients, 0))
 
+const alike = (a: { net: { ssid: string; key: string; encryption: string; hidden: boolean } }, b: typeof a) =>
+  a.net.ssid === b.net.ssid && a.net.key === b.net.key && a.net.encryption === b.net.encryption && a.net.hidden === b.net.hidden
+const sameNow = computed(() => bands.value.length > 1 && bands.value.every((b) => alike(b, bands.value[0]!)))
+// What the switch says: the config, until someone flips it.
+const choice = ref<boolean | null>(null)
+const shared = computed(() => bands.value.length > 1 && (choice.value ?? sameNow.value))
+// The join tile shows what is saved, so only once the bands really are alike.
+const joinNet = computed(() => (sameNow.value ? (bands.value.find((b) => b.radio.band === '5g') ?? bands.value[0])!.net : null))
+
 function afterSave(): void {
-  // Give hostapd a moment to come back before reading the state again.
+  // Give hostapd a moment to come back before reading the state again. The
+  // saved config decides the layout from here on.
+  choice.value = null
   setTimeout(load, 4000)
 }
 </script>
@@ -44,9 +65,25 @@ function afterSave(): void {
 
   <v-alert v-if="error" type="error" variant="tonal" rounded="xl">{{ error }}</v-alert>
 
+  <section v-if="radios && bands.length > 1" class="hk-card hk-same" aria-label="Same name on both bands">
+    <div class="d-flex align-center ga-3">
+      <div class="d-flex flex-column flex-grow-1">
+        <span style="font-size: 15px; font-weight: 500">Same name on both bands</span>
+        <span class="hk-label">{{ shared ? 'Devices move between 2.4 and 5 GHz by themselves' : 'Each band has its own name and password' }}</span>
+      </div>
+      <M3Switch :model-value="shared" label="Same name on both bands" @update:model-value="choice = $event" />
+    </div>
+    <span v-if="choice !== null && choice !== sameNow" class="hk-label">
+      {{ choice ? 'Set the name and password below and save to put them on every band.' : 'Change a band’s name or password and save it to give it its own.' }}
+    </span>
+  </section>
+
+  <WifiJoin v-if="shared && joinNet && !joinNet.disabled" :ssid="joinNet.ssid" :password="joinNet.key" :encryption="joinNet.encryption" />
+
   <div class="hk-grid-3 hk-wifi">
     <template v-if="radios">
-      <BandCard v-for="b in bands" :key="b.net.section" :radio="b.radio" :net="b.net" @saved="afterSave" />
+      <SharedWifiCard v-if="shared" :bands="bands" @saved="afterSave" />
+      <BandCard v-for="b in bands" :key="b.net.section" :radio="b.radio" :net="b.net" :shared="shared" @saved="afterSave" />
       <!-- A guest setup made elsewhere (LuCI) keeps plain band cards. -->
       <template v-if="gstate?.foreign">
         <BandCard v-for="g in guest" :key="g.net.section" :radio="g.radio" :net="g.net" @saved="afterSave" />
@@ -62,5 +99,10 @@ function afterSave(): void {
 <style scoped>
 .hk-wifi {
   align-items: start;
+}
+.hk-same {
+  padding-top: 16px;
+  padding-bottom: 16px;
+  gap: 6px;
 }
 </style>

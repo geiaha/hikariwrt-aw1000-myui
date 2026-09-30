@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import HkIcon from '@/components/icons/HkIcon.vue'
 import M3Switch from '@/components/m3/M3Switch.vue'
 import SecretField from '@/components/m3/SecretField.vue'
+import WifiJoin from '@/components/wifi/WifiJoin.vue'
 import { saveWifi, type WifiNetwork, type WifiRadio } from '@/api/wifi'
 import { setWifiAp } from '@/api/services'
 import { useAction } from '@/composables/action'
@@ -13,7 +14,11 @@ import { keyError, ssidError } from '@/utils/validate'
 // radio (channel, width). When aw1000-mesh uses the radio, channel and
 // width belong to the mesh (every node must move together), so they are
 // shown but changed on the Mesh page.
-const props = defineProps<{ radio: WifiRadio; net: WifiNetwork }>()
+//
+// `shared`: the name and password are set once for every band (the
+// SharedWifiCard above), so this card keeps only what is per band - on/off,
+// channel and width.
+const props = defineProps<{ radio: WifiRadio; net: WifiNetwork; shared?: boolean }>()
 const emit = defineEmits<{ saved: [] }>()
 const { busy, run } = useAction()
 const { ask } = useConfirm()
@@ -50,6 +55,8 @@ const channelItems = computed(() => [
   ...props.radio.channels.map((c) => ({ value: String(c.channel), title: `${c.channel} · ${c.mhz} MHz` })),
 ])
 const widthItems = computed(() => props.radio.htmodes.map((h) => ({ value: h, title: `${h.replace(/^\D+/, '')} MHz` })))
+
+const showQr = ref(false)
 
 const errors = computed(() => ({ ssid: ssidError(form.ssid), key: keyError(form.key, form.encryption) }))
 const valid = computed(() => !errors.value.ssid && !errors.value.key)
@@ -122,6 +129,14 @@ async function toggle(on: boolean): Promise<void> {
       <M3Switch :model-value="!net.disabled" :label="`${title} Wi-Fi`" :busy="busy.toggle" @update:model-value="toggle" />
     </div>
 
+    <p v-if="shared" class="hk-label" style="margin: 0">Name and password are shared by all bands and set in the Wi-Fi card.</p>
+    <template v-else>
+    <div v-if="!net.disabled" class="d-flex justify-end" style="margin: -8px 0">
+      <v-btn variant="text" color="primary" size="small" @click="showQr = !showQr">
+        <HkIcon name="qr" :size="18" class="mr-1" />{{ showQr ? 'Hide QR code' : 'QR code' }}
+      </v-btn>
+    </div>
+    <WifiJoin v-if="showQr && !net.disabled" :ssid="net.ssid" :password="net.key" :encryption="net.encryption" :title="`Join ${title} Wi-Fi`" :size="140" stacked />
     <v-text-field v-model="form.ssid" label="Network name" hide-details="auto" :error-messages="errors.ssid || undefined" />
     <v-select v-model="form.encryption" :items="securityItems" item-title="title" item-value="value" label="Security" hide-details>
       <template #item="{ props: p, item }">
@@ -137,6 +152,7 @@ async function toggle(on: boolean): Promise<void> {
       </div>
       <M3Switch v-model="form.hidden" label="Hide network name" />
     </div>
+    </template>
 
     <div class="hk-radio">
       <v-select v-model="form.channel" :items="channelItems" label="Channel" hide-details :disabled="radio.meshOwned" />

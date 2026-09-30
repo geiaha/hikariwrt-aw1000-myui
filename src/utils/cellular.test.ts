@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bandDescription, bars5, gnbId, joinSms, maskIccid, qualityHeadline, scale, shortRevision, smsLength } from './cellular'
+import { bandDescription, bars5, gnbId, homePlmn, isForeignCell, joinSms, maskIccid, plmnLabel, qualityHeadline, scale, shortRevision, smsLength } from './cellular'
 
 it('scale clamps', () => {
   expect(scale(-98, -140, -44)).toBeCloseTo(0.4375)
@@ -54,5 +54,22 @@ describe('smsLength', () => {
   it('switches to UCS-2 for anything else', () => {
     expect(smsLength('Salamat 🙏')).toEqual({ encoding: 'UCS-2', used: 10, max: 70, fits: true })
     expect(smsLength('ñ'.repeat(10)).encoding).toBe('GSM-7')
+  })
+})
+
+describe('operator of a cell', () => {
+  it('builds the home PLMN only when both halves are known', () => {
+    expect(homePlmn('515', '02')).toBe('51502')
+    expect(homePlmn('515', undefined)).toBeNull()
+  })
+  it('flags only cells known to be on another network', () => {
+    expect(isForeignCell({ plmn: '51566' }, '51502')).toBe(true)
+    expect(isForeignCell({ plmn: '51502' }, '51502')).toBe(false)
+    expect(isForeignCell({ plmn: null }, '51502')).toBe(false)
+    expect(isForeignCell({ plmn: '51566' }, null)).toBe(false)
+  })
+  it('writes a PLMN as MCC-MNC', () => {
+    expect(plmnLabel('51566')).toBe('515-66')
+    expect(plmnLabel('310260')).toBe('310-260')
   })
 })
