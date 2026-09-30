@@ -5,6 +5,7 @@ import type { UplinkView } from '@/composables/home'
 import type { ModemStatus } from '@/api/modem'
 import { signed } from '@/utils/format'
 import { uptimePct } from '@/utils/series'
+import { radioMode } from '@/utils/uplinks'
 
 // Phone hero: the same status as the desktop hero, with the uplinks as a
 // connected list instead of a diagram.
@@ -25,9 +26,9 @@ const uptimeToday = computed(() => {
 function detail(u: UplinkView): string {
   if (u.cellular && props.modem?.operator) {
     const s = props.modem.signal
-    return [props.modem.operator, s?.band, s?.rsrp != null ? `${signed(s.rsrp)} dBm` : null].filter(Boolean).join(' · ')
+    return [props.modem.operator, radioMode(props.modem.mode_label), u.families, s?.rsrp != null ? `${signed(s.rsrp)} dBm` : null].filter(Boolean).join(' · ')
   }
-  return [u.proto, u.ipv4].filter(Boolean).join(' · ')
+  return [u.proto, u.ipv4, u.families].filter(Boolean).join(' · ')
 }
 const WORD = { active: 'In use', standby: 'Standby', down: 'Down' } as const
 </script>

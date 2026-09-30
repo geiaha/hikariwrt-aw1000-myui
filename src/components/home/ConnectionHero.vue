@@ -5,6 +5,7 @@ import type { UplinkView } from '@/composables/home'
 import type { ModemStatus } from '@/api/modem'
 import { durationLong } from '@/utils/format'
 import { uptimePct } from '@/utils/series'
+import { radioMode } from '@/utils/uplinks'
 
 // The primary-container hero: status text on the left, and the connection
 // drawn as a path: Internet -> uplinks (solid = carrying traffic, dashed =
@@ -38,8 +39,7 @@ const subtitle = computed(() => {
 function detail(u: UplinkView): string {
   if (u.cellular && props.modem?.operator) {
     const op = props.modem.operator
-    const mode = props.modem.mode_label ? `NR5G-${props.modem.mode_label.replace(/^5G-/, '')}` : ''
-    return [op, [mode, props.modem.signal?.band].filter(Boolean).join(' ')].filter(Boolean).join(' · ')
+    return [op, radioMode(props.modem.mode_label)].filter(Boolean).join(' · ')
   }
   return [u.proto, u.ipv4].filter(Boolean).join(' · ')
 }
@@ -73,7 +73,7 @@ const STATE_WORD = { active: 'active', standby: 'standby', down: 'down' } as con
           <div class="hk-pill">
             <HkIcon :name="u.cellular ? 'cellular' : 'ethernet'" :size="20" class="hk-pill__icon" />
             <div class="hk-pill__text">
-              <span class="hk-pill__title">{{ u.label }} · {{ STATE_WORD[u.state] }}</span>
+              <span class="hk-pill__title">{{ u.label }} · {{ STATE_WORD[u.state] }}<span v-if="u.families" class="hk-pill__ip" :title="`IP versions up on this link: ${u.families}`">{{ u.families }}</span></span>
               <span class="hk-pill__sub">{{ detail(u) }}</span>
             </div>
           </div>
@@ -269,6 +269,20 @@ const STATE_WORD = { active: 'active', standby: 'standby', down: 'down' } as con
   font-weight: 600;
   font-size: 14px;
   white-space: nowrap;
+}
+/* the IP versions up on the link, one badge per link (IPv4 and IPv6 are
+   one uplink, not two) */
+.hk-pill__ip {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 7px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  vertical-align: 1px;
+  background: rgb(var(--v-theme-secondary-container));
+  color: rgb(var(--v-theme-on-secondary-container));
 }
 .hk-pill__sub {
   font-size: 12px;

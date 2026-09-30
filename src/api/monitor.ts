@@ -10,6 +10,8 @@ export interface MonitorWan {
   name: string
   label: string
   enabled: boolean
+  /** Its network interface is switched off (a 5G router's wired wan): not monitored, not shown. */
+  iface_disabled?: boolean
   targets: string[]
   last: {
     ts: number

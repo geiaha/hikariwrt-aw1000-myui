@@ -30,7 +30,10 @@ watch(range, () => data.refresh())
 
 const st = computed(() => status.data.value)
 const ser = computed(() => (data.data.value?.r === range.value ? data.data.value.series : null))
-const outages = computed(() => (data.data.value?.events.events ?? []).filter((e) => !only.value || e.wan === only.value))
+// Outages of a hidden WAN (from before its interface went off) are left out too.
+const outages = computed(() =>
+  (data.data.value?.events.events ?? []).filter((e) => wans.value.some((w) => w.name === e.wan) && (!only.value || e.wan === only.value)),
+)
 
 // 90 days and a year exist only while history is kept on USB for that long.
 const ranges = computed(() => {
@@ -50,9 +53,12 @@ watch(ranges, (r) => {
 
 // Colours from the Material You palette: a role per WAN, error for loss.
 const COLORS = ['rgb(var(--v-theme-primary))', 'rgb(var(--v-theme-tertiary))', 'rgb(var(--v-theme-secondary))', 'rgb(var(--v-theme-info))']
-const colorOf = (name: string) => COLORS[Math.max(0, st.value?.wans.findIndex((w) => w.name === name) ?? 0) % COLORS.length]!
+// WANs whose interface is switched off - the wired wan of a "5G router" -
+// have nothing to measure, so the page leaves them out entirely.
+const wans = computed(() => st.value?.wans.filter((w) => !w.iface_disabled) ?? [])
+const colorOf = (name: string) => COLORS[Math.max(0, wans.value.findIndex((w) => w.name === name)) % COLORS.length]!
 
-const enabled = computed(() => st.value?.wans.filter((w) => w.enabled) ?? [])
+const enabled = computed(() => wans.value.filter((w) => w.enabled))
 const shown = computed<WanSeries[]>(() =>
   (ser.value?.wans ?? []).filter((s) => enabled.value.some((w) => w.name === s.name) && (!only.value || s.name === only.value)),
 )
@@ -132,7 +138,7 @@ const fmtPctAxis = (v: number) => `${v}%`
   <!-- Health, one card per WAN -->
   <div class="hk-mon-health">
     <template v-if="st">
-      <section v-for="w in st.wans" :key="w.name" class="hk-card" :aria-label="`${w.label} health`" style="gap: 14px">
+      <section v-for="w in wans" :key="w.name" class="hk-card" :aria-label="`${w.label} health`" style="gap: 14px">
         <div class="d-flex align-center ga-3">
           <span class="hk-dot hk-dot--lg" :style="{ background: colorOf(w.name) }" />
           <div class="d-flex flex-column flex-grow-1" style="min-width: 0">

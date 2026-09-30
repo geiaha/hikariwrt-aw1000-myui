@@ -28,6 +28,8 @@ export interface NetInterface {
   metric?: number
   'ipv4-address'?: { address: string; mask: number }[]
   'ipv6-address'?: { address: string; mask: number }[]
+  /** Delegated prefixes; a wired DHCPv6 uplink may have one and no address. */
+  'ipv6-prefix'?: { address: string; mask: number }[]
   route?: { target: string; mask: number; nexthop: string }[]
 }
 

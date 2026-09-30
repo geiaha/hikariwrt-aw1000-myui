@@ -9,6 +9,8 @@ import * as uci from './uci'
 export interface MultiwanIface {
   name: string
   interface?: string
+  /** ipv4 or ipv6: multi-WAN watches each family of a link as its own entry. */
+  family?: 'ipv4' | 'ipv6' | string
   label: string
   status: string
   device: string
