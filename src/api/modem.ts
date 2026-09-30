@@ -37,7 +37,13 @@ export interface ModemStatus {
   registered: boolean
   mode?: string
   mode_label?: string
+  /** Display name: the SIM's own (EF_SPN), else the operator list by
+   *  MCC/MNC, else the network's broadcast name tidied up. */
   operator?: string
+  operator_source?: 'sim' | 'list' | 'network' | null
+  spn?: string | null
+  network_name?: string | null
+  roaming_abroad?: boolean
   tac?: string
   gnb_id_bits?: number
   error?: string | null
@@ -213,7 +219,19 @@ export interface ProfileInfo {
   }
   apn_verify: number
   verify: { state: 'pending' | 'ok' | 'rolled_back' | string; at: number | null; restored: string }
-  ttl: { value: number; active: boolean }
+  ttl: {
+    value: number
+    /** The rule is loaded and covers the device the modem is on now. */
+    active: boolean
+    pattern?: string
+    device?: string
+    /** Packets rewritten since the firewall last loaded the rule. */
+    packets?: number
+    /** NSS acceleration: paused ("off") while TTL is on and the modem is up,
+     *  because offloaded packets never pass the rule. */
+    offload?: 'on' | 'off' | 'absent'
+    paused_for_ttl?: boolean
+  }
   mcc: string
   carriers?: Carrier[]
 }

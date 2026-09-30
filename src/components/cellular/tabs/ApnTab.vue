@@ -34,7 +34,9 @@ const username = ref('')
 const password = ref('')
 const pdptype = ref('')
 const ttlOn = ref(false)
-const ttl = ref(65)
+// 64: the rule sets the value on the way out, after forwarding has taken its
+// hop off, so the carrier sees exactly this - and 64 is what a phone sends.
+const ttl = ref(64)
 
 function fill(p: ProfileInfo): void {
   info.value = p
@@ -182,7 +184,14 @@ const V6: Record<string, string> = { dual: 'IPv4 and IPv6', split: 'IPv4 and IPv
           </div>
           <M3Switch v-model="ttlOn" label="Fixed TTL" :disabled="!info" />
         </div>
-        <v-text-field v-if="ttlOn" v-model.number="ttl" type="number" min="1" max="255" label="TTL" hint="64 or 65 is common" persistent-hint />
+        <v-text-field v-if="ttlOn" v-model.number="ttl" type="number" min="1" max="255" label="TTL" hint="64 matches a phone's own traffic" persistent-hint />
+        <div v-if="info && info.ttl.value > 0" class="d-flex flex-column ga-1">
+          <span class="hk-label">
+            <template v-if="info.ttl.active">Working on {{ info.ttl.device || info.ttl.pattern }}<template v-if="info.ttl.packets != null"> · {{ info.ttl.packets.toLocaleString() }} packets rewritten</template></template>
+            <template v-else>The rule isn’t covering the 5G connection right now. Save again, or check the firewall.</template>
+          </span>
+          <span v-if="info.ttl.paused_for_ttl" class="hk-label">Hardware offload is paused while 5G is up, so every packet gets the new TTL.</span>
+        </div>
         <div class="d-flex justify-end">
           <v-btn variant="flat" color="primary" height="40" :disabled="!ttlDirty" :loading="busy.ttl" @click="saveTtl">Save</v-btn>
         </div>

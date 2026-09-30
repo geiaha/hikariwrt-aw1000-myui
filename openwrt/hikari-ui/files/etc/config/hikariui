@@ -3,3 +3,8 @@
 # the package was installed, so they never see the wizard pop up).
 config setup 'setup'
 	option done '0'
+
+# The web UI's colours and light/dark choice, kept here as well as in each
+# browser so they follow the router rather than the browser. Written by the UI
+# on the first sign-in and on every change.
+config appearance 'appearance'

@@ -25,7 +25,7 @@ const uptimeToday = computed(() => {
 function detail(u: UplinkView): string {
   if (u.cellular && props.modem?.operator) {
     const s = props.modem.signal
-    return [props.modem.operator.replace(/^\d{3} \d{2,3} /, ''), s?.band, s?.rsrp != null ? `${signed(s.rsrp)} dBm` : null].filter(Boolean).join(' · ')
+    return [props.modem.operator, s?.band, s?.rsrp != null ? `${signed(s.rsrp)} dBm` : null].filter(Boolean).join(' · ')
   }
   return [u.proto, u.ipv4].filter(Boolean).join(' · ')
 }

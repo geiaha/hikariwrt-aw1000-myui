@@ -17,7 +17,7 @@ defineProps<{ link: UplinkView | null; modem: ModemStatus | null }>()
       </template>
     </div>
     <dl class="hk-group hk-kv">
-      <div><dt>Network</dt><dd>{{ modem?.operator?.replace(/^\d{3} \d{2,3} /, '') || '—' }}<template v-if="modem?.mode_label"> · {{ modem.mode_label }}</template></dd></div>
+      <div><dt>Network</dt><dd>{{ modem?.operator || '—' }}<template v-if="modem?.mode_label"> · {{ modem.mode_label }}</template></dd></div>
       <div><dt>Band</dt><dd>{{ modem?.signal?.band ?? '—' }}</dd></div>
       <div><dt>Address</dt><dd>{{ link?.ipv4 ?? '—' }}</dd></div>
       <div><dt>Latency</dt><dd>{{ link?.latency != null ? `${link.latency.toFixed(0)} ms` : '—' }}</dd></div>

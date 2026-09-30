@@ -16,6 +16,12 @@ onMounted(async () => (nets.value = await vpn.networks().catch(() => null)))
 
 const tunnels = computed(() => list.data.value?.tunnels ?? [])
 const up = computed(() => tunnels.value.filter((t) => t.enabled && t.up).length)
+// Only one tunnel may route everyone (the backend refuses a second); each card
+// is told which other tunnel has it, so it can show the choice as taken.
+const everyoneOwner = (name: string) => {
+  const o = tunnels.value.find((t) => t.name !== name && t.route_mode === 'all')
+  return o ? o.label || o.name : null
+}
 </script>
 
 <template>
@@ -42,7 +48,7 @@ const up = computed(() => tunnels.value.filter((t) => t.enabled && t.up).length)
   </section>
 
   <div v-else class="hk-grid-3" style="align-items: start">
-    <TunnelCard v-for="t in tunnels" :key="t.name" :tunnel="t" :nets="nets" @changed="list.refresh()" />
+    <TunnelCard v-for="t in tunnels" :key="t.name" :tunnel="t" :nets="nets" :everyone-owner="everyoneOwner(t.name)" @changed="list.refresh()" />
     <template v-if="!list.data.value && !list.error.value">
       <v-skeleton-loader v-for="i in 2" :key="i" type="heading, text@6" class="hk-card" />
     </template>

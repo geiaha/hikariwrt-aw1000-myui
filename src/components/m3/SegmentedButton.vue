@@ -3,7 +3,7 @@ import HkIcon from '@/components/icons/HkIcon.vue'
 
 // M3 segmented button (single select): outlined, the chosen segment in
 // secondary-container with a leading check.
-defineProps<{ modelValue: T; options: { value: T; label: string }[]; label: string; disabled?: boolean }>()
+defineProps<{ modelValue: T; options: { value: T; label: string; disabled?: boolean; title?: string }[]; label: string; disabled?: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [value: T] }>()
 </script>
 
@@ -16,7 +16,8 @@ const emit = defineEmits<{ 'update:modelValue': [value: T] }>()
       class="hk-seg__btn"
       :class="{ 'is-on': o.value === modelValue }"
       :aria-pressed="o.value === modelValue ? 'true' : 'false'"
-      :disabled="disabled"
+      :disabled="disabled || o.disabled"
+      :title="o.title"
       @click="o.value !== modelValue && emit('update:modelValue', o.value)"
     >
       <HkIcon v-if="o.value === modelValue" name="check" :size="16" :stroke="2.6" />

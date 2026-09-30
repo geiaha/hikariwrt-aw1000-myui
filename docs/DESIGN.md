@@ -20,9 +20,19 @@ distinctive pieces are our own components, drawn to match the boards.
     Monochrome.
   - **Contrast:** Standard 0, Medium 0.5 or High 1.
   - **Mode:** Auto (follows the OS), Light or Dark.
-- **Storage.** Appearance is a per-browser preference in localStorage
-  (`stores/appearance.ts`), not router config. It is set in the menu drawer;
-  the boards have no palette button in the header.
+- **Storage.** Appearance is kept in two places.
+  - **In the browser** (localStorage, `stores/appearance.ts`), for the first
+    paint, including the login page.
+  - **On the router** (`/etc/config/hikariui`, section `appearance`, via
+    `composables/appearanceSync.ts`), so it follows the router rather than the
+    browser. localStorage alone was lost on another device, after the router's
+    address changed (storage is per address), or when a browser cleared site
+    data on exit.
+  - **How they sync:** on sign-in the router's copy wins. When the router has
+    none yet, this browser's choice is written there. Every change is saved to
+    both, with the router write debounced by 800 ms.
+  - It is set in the menu drawer and on System; the boards have no palette
+    button in the header.
 
 ### Vuetify ↔ M3 mapping
 

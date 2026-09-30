@@ -10,7 +10,7 @@ import { signed } from '@/utils/format'
 const props = defineProps<{ modem: ModemStatus | null; diag: ModemDiag | null; lock: LockInfo | null; profile: ProfileInfo | null }>()
 
 const s = computed(() => props.modem?.signal ?? null)
-const operator = computed(() => props.modem?.operator?.replace(/^\d{3} \d{2,3} /, '') ?? '')
+const operator = computed(() => props.modem?.operator ?? '')
 const pcc = computed(() => props.modem?.bands?.find((b) => b.role === 'PCC') ?? props.modem?.bands?.[0] ?? null)
 const temp = computed(() => {
   const t = props.diag?.temperatures

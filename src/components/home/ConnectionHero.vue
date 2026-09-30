@@ -37,7 +37,7 @@ const subtitle = computed(() => {
 
 function detail(u: UplinkView): string {
   if (u.cellular && props.modem?.operator) {
-    const op = props.modem.operator.replace(/^\d{3} \d{2,3} /, '')
+    const op = props.modem.operator
     const mode = props.modem.mode_label ? `NR5G-${props.modem.mode_label.replace(/^5G-/, '')}` : ''
     return [op, [mode, props.modem.signal?.band].filter(Boolean).join(' ')].filter(Boolean).join(' · ')
   }

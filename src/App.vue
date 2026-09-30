@@ -7,6 +7,7 @@ import { useAppearance } from '@/stores/appearance'
 import { useSession } from '@/stores/session'
 import { buildThemes } from '@/theme/material'
 import { useNotify } from '@/composables/notify'
+import { useAppearanceSync } from '@/composables/appearanceSync'
 import ConfirmHost from '@/components/ConfirmHost.vue'
 import SpeedTestDialog from '@/components/SpeedTestDialog.vue'
 import OfflineOverlay from '@/components/OfflineOverlay.vue'
@@ -16,6 +17,7 @@ const look = useAppearance()
 const session = useSession()
 const router = useRouter()
 const notify = useNotify()
+useAppearanceSync()
 
 // Regenerate both schemes whenever the seed, variant or contrast changes,
 // and follow the chosen mode ('system' tracks prefers-color-scheme).

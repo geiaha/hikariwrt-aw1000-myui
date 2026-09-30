@@ -15,7 +15,12 @@ import { parseList } from '@/utils/validate'
 // One WireGuard tunnel: on/off, whose traffic uses it, which uplink it rides,
 // the peer's state, and removal. aw1000-vpn does the routing and firewall
 // work (and the NSS flow flush) behind each call.
-const props = defineProps<{ tunnel: Tunnel; nets: VpnNetworks | null }>()
+const props = defineProps<{
+  tunnel: Tunnel
+  nets: VpnNetworks | null
+  /** Label of the other tunnel that routes everyone, if any: only one can. */
+  everyoneOwner?: string | null
+}>()
 const emit = defineEmits<{ changed: [] }>()
 const { busy, run } = useAction()
 const { ask } = useConfirm()
@@ -119,13 +124,16 @@ async function removeIt(): Promise<void> {
         :options="[
           { value: 'off', label: 'Nobody' },
           { value: 'selected', label: 'Selected' },
-          { value: 'all', label: 'Everyone' },
+          { value: 'all', label: 'Everyone', disabled: !!everyoneOwner, title: everyoneOwner ? `${everyoneOwner} already routes everyone` : undefined },
         ]"
       />
       <p class="hk-label mt-2" style="margin: 0">
         <template v-if="form.mode === 'off'">The tunnel is up but no traffic is sent through it.</template>
         <template v-else-if="form.mode === 'all'">Every device on your networks goes through the VPN.</template>
         <template v-else>Only the networks and addresses you pick go through the VPN.</template>
+      </p>
+      <p v-if="everyoneOwner" class="hk-label mt-1" style="margin: 0">
+        Everyone already goes through {{ everyoneOwner }}, and only one tunnel can route everyone. Devices or networks you pick here use this tunnel instead.
       </p>
     </div>
 

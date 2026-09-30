@@ -9,7 +9,7 @@ import { signed } from '@/utils/format'
 
 const props = defineProps<{ modem: ModemStatus | null; link: UplinkView | null; loading: boolean }>()
 
-const operator = computed(() => props.modem?.operator?.replace(/^\d{3} \d{2,3} /, '') ?? '')
+const operator = computed(() => props.modem?.operator ?? '')
 const mode = computed(() => props.modem?.mode_label?.replace('-', ' ') ?? '')
 const s = computed(() => props.modem?.signal ?? null)
 </script>

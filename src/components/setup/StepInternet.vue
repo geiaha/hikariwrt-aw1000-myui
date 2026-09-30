@@ -11,7 +11,7 @@ const props = defineProps<{ s: SetupState }>()
 const e = computed(() => props.s.wanErrors.value)
 const m = computed(() => props.s.orig.modem)
 const carriers = computed(() => (props.s.orig.profile?.carriers ?? []).map((c) => ({ value: c.id, title: `${c.name} · ${c.apn}` })))
-const operator = computed(() => m.value?.operator?.replace(/^\d{3} \d{2,3} /, '') ?? '')
+const operator = computed(() => m.value?.operator ?? '')
 </script>
 
 <template>
