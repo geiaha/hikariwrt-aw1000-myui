@@ -6,3 +6,5 @@ dist/
 *.log
 # Filled by `npm run package`; the OpenWrt package installs from here.
 openwrt/hikari-ui/files/www/
+# Output of android/build.sh (the APK, R.java, class files).
+android/build/

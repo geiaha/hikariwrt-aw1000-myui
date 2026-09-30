@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cleartext is allowed because the router serves its web UI over plain HTTP
+  on the LAN, at an address the user types in (so it can't be listed here).
+  HTTPS still works: a router's self-signed certificate is trusted only after
+  the user accepts its fingerprint once, and is pinned from then on
+  (MainActivity.pinOf / trustsPinned).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

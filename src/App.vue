@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { watchEffect } from 'vue'
-import { useRouter } from 'vue-router'
+import { nextTick, watch, watchEffect } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useTheme } from 'vuetify'
 import { onSessionExpired } from '@/api/ubus'
 import { useAppearance } from '@/stores/appearance'
 import { useSession } from '@/stores/session'
 import { buildThemes } from '@/theme/material'
 import { useNotify } from '@/composables/notify'
+import { setBars } from '@/utils/app'
 import { useAppearanceSync } from '@/composables/appearanceSync'
 import ConfirmHost from '@/components/ConfirmHost.vue'
 import SpeedTestDialog from '@/components/SpeedTestDialog.vue'
@@ -33,6 +34,29 @@ watchEffect(() => {
   }
 })
 watchEffect(() => theme.change(look.mode))
+
+// The phone's system bars follow the UI: the Android app tints them through
+// its bridge, a mobile browser takes <meta name="theme-color">. Top is the app
+// bar's colour; bottom is the bottom navigation's where the page has one.
+const route = useRoute()
+watch(
+  () => [theme.current.value.colors.surface, theme.current.value.colors['surface-container'], theme.current.value.dark, route.fullPath],
+  async () => {
+    await nextTick()
+    const c = theme.current.value.colors
+    const top = String(c.surface ?? '#ffffff')
+    const bottom = String(document.querySelector('.hk-bottom') ? (c['surface-container'] ?? top) : top)
+    let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+    if (!meta) {
+      meta = document.createElement('meta')
+      meta.name = 'theme-color'
+      document.head.appendChild(meta)
+    }
+    meta.content = top
+    setBars(top, bottom, theme.current.value.dark)
+  },
+  { immediate: true },
+)
 
 onSessionExpired(() => {
   if (!session.sid) return

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press the app icon: straight to the setup screen, e.g. after the router moved. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="setup"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_setup_short"
+        android:shortcutLongLabel="@string/shortcut_setup_long">
+        <intent
+            android:action="moe.hikarishii.hikariwrt.SETUP"
+            android:targetPackage="moe.hikarishii.hikariwrt"
+            android:targetClass="moe.hikarishii.hikariwrt.MainActivity" />
+    </shortcut>
+</shortcuts>

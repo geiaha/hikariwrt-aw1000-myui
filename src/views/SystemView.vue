@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import AppearanceSettings from '@/components/AppearanceSettings.vue'
 import SecretField from '@/components/m3/SecretField.vue'
+import AndroidAppCard from '@/components/system/AndroidAppCard.vue'
 import FirmwareCard from '@/components/system/FirmwareCard.vue'
 import LogCard from '@/components/system/LogCard.vue'
 import * as sys from '@/api/system'
@@ -100,6 +101,7 @@ async function reset(): Promise<void> {
   <PageHeader :overline="`${session.board?.model ?? 'Router'} · ${session.board?.release.distribution ?? ''} ${session.board?.release.version ?? ''}`" title="System" />
 
   <div class="hk-grid-3" style="align-items: start">
+    <AndroidAppCard />
     <section class="hk-card" aria-label="Name and time" style="gap: 14px">
       <h2 class="hk-h2">Name and time</h2>
       <template v-if="settings">

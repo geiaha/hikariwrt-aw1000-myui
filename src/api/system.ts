@@ -4,6 +4,7 @@
 
 import { call, getSession } from './ubus'
 import * as uci from './uci'
+import { appDownload } from '@/utils/app'
 
 // ---- name and time ----
 
@@ -84,6 +85,10 @@ export const discardFirmware = () => call('file', 'remove', { path: FIRMWARE_PAT
  * the browser to save it.
  */
 export function downloadBackup(): void {
+  // In the Android app a WebView can't save a POSTed download, so the app
+  // re-issues it natively into Downloads.
+  const name = `backup-${location.hostname}-${new Date().toISOString().slice(0, 10)}.tar.gz`
+  if (appDownload('/cgi-bin/cgi-backup', { sessionid: getSession() }, name)) return
   const f = document.createElement('form')
   f.method = 'POST'
   f.action = '/cgi-bin/cgi-backup'

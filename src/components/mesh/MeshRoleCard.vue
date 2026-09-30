@@ -8,6 +8,7 @@ import { useAction } from '@/composables/action'
 import { useConfirm } from '@/composables/confirm'
 import { useNotify } from '@/composables/notify'
 import { luciUrl } from '@/nav'
+import { copyText } from '@/utils/app'
 
 // What this router is in the mesh, and changing it. Gateway = the node with
 // the internet; it hands out a join code carrying the mesh name, key,
@@ -103,12 +104,8 @@ async function showCode(): Promise<void> {
   })
 }
 async function copy(): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(joinCode.value)
-    notify.show('Join code copied')
-  } catch {
-    notify.show('Select the code and copy it by hand (the browser blocked the clipboard).')
-  }
+  if (await copyText(joinCode.value)) notify.show('Join code copied')
+  else notify.show('Select the code and copy it by hand (the browser blocked the clipboard).')
 }
 
 async function turnOff(): Promise<void> {

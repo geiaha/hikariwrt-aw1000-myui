@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The web UI's default seed colour (DEFAULT_SEED in src/theme/material.ts). -->
+    <color name="seed">#E8A317</color>
+    <color name="icon_ink">#2A1C00</color>
+</resources>

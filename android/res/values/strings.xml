@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">HikariWrt</string>
+    <string name="shortcut_setup_short">Router address</string>
+    <string name="shortcut_setup_long">Change router address</string>
+</resources>
