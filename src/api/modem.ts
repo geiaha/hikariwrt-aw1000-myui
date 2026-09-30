@@ -241,7 +241,21 @@ export interface ProfileInfo {
 
 export interface Ipv6Info {
   ok: boolean
-  config: { mode: string; style: string; pdptype: string; nat64: string; delegate: string; passthrough: string }
+  config: {
+    mode: string
+    carrier?: string
+    /** dual (one IPv4v6 context), split (one per family), v6only, v4only */
+    style: string
+    pdptype: string
+    apnv6?: string
+    multiplexing?: string
+    nat64: string
+    nat64prefix?: string
+    delegate: string
+    sourcefilter?: string
+    prefixlifetime?: string
+    passthrough: string
+  }
   call: { up: boolean; families: string; ipv4: string; ipv6: string; ipv6_length: string; prefix: string; prefix_length: string }
   assessment: { state: string; text: string; style: string; why: string }
 }
@@ -261,6 +275,8 @@ export const lockinfo = () => call<LockInfo>('luci.aw1000-modem', 'lockinfo')
 export const usageinfo = () => call<UsageInfo>('luci.aw1000-modem', 'usageinfo')
 export const smslist = () => call<SmsList>('luci.aw1000-modem', 'smslist')
 export const profileinfo = () => call<ProfileInfo>('luci.aw1000-modem', 'profileinfo')
+/** The same, with the carrier list of another country (by MCC). */
+export const profileinfoFor = (mcc: string) => call<ProfileInfo>('luci.aw1000-modem', 'profileinfo', { mcc })
 export const ipv6info = () => call<Ipv6Info>('luci.aw1000-modem', 'ipv6info')
 export const routerstatus = () => call<RouterStatus>('luci.aw1000-modem', 'routerstatus')
 
@@ -331,6 +347,26 @@ export const smsStorage = (storage: 'ME' | 'SM', persist: boolean) =>
 export const setApn = (p: { mode: string; apn: string; auth: string; username: string; password: string; pdptype: string; carrier: string }) =>
   call<WriteReply<ProfileInfo>>('luci.aw1000-modem', 'setapn', p)
 /** 1..255 rewrites outgoing TTL/hop limit; 0 turns it off. */
+/**
+ * The dial's IP arrangement (aw1000-modem-ipv6 set). Every option is sent,
+ * because the helper writes each one as given: a blank would clear it - and
+ * sourcefilter cleared is IPv6 dropped upstream as spoofed. `withStyle` keeps
+ * the current settings and changes only the arrangement.
+ */
+export const setIpv6 = (c: Ipv6Info['config']) =>
+  call<WriteReply<Ipv6Info>>('luci.aw1000-modem', 'setipv6', {
+    mode: c.mode === 'list' && c.carrier ? 'list' : 'manual',
+    carrier: c.mode === 'list' ? (c.carrier ?? '') : '',
+    style: c.style,
+    apnv6: c.apnv6 ?? '',
+    nat64: c.nat64 ?? 'auto',
+    nat64prefix: c.nat64prefix ?? '',
+    delegate: c.delegate ?? '',
+    sourcefilter: c.sourcefilter ?? '',
+    prefixlifetime: c.prefixlifetime ?? '',
+  })
+export const withStyle = (c: Ipv6Info['config'], style: string): Ipv6Info['config'] => ({ ...c, mode: 'manual', carrier: '', style })
+
 export const setTtl = (value: number) => call<WriteReply<ProfileInfo>>('luci.aw1000-modem', 'setttl', { value: String(value) })
 
 // ---- data usage (replies are the full usageinfo, with `done`) ----

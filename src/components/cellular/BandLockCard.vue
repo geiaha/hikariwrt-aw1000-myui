@@ -10,7 +10,9 @@ import { useConfirm } from '@/composables/confirm'
 //                groups usually hold), LTE and 3G stay as they are ('-')
 //   group 'lte'  LTE only
 // Re-registers so the change takes effect now.
-const props = withDefaults(defineProps<{ lock: LockInfo | null; group?: 'nr' | 'lte' }>(), { group: 'nr' })
+// `embedded`: inside another card (Home's quick band lock), so no card
+// chrome and no title of its own.
+const props = withDefaults(defineProps<{ lock: LockInfo | null; group?: 'nr' | 'lte'; embedded?: boolean }>(), { group: 'nr', embedded: false })
 const P = computed(() => (props.group === 'lte' ? 'B' : 'n'))
 const NAME = computed(() => (props.group === 'lte' ? 'LTE' : '5G'))
 const emit = defineEmits<{ applied: [] }>()
@@ -53,10 +55,10 @@ async function apply(): Promise<void> {
 </script>
 
 <template>
-  <section class="hk-card" :aria-label="`${NAME} band lock`" style="padding: 20px 24px; gap: 14px">
+  <section :class="embedded ? 'hk-band-embedded' : 'hk-card'" :aria-label="`${NAME} band lock`" :style="embedded ? undefined : 'padding: 20px 24px; gap: 14px'">
     <div class="d-flex align-center flex-wrap ga-3">
       <div class="d-flex flex-column flex-grow-1" style="min-width: 0">
-        <h2 class="hk-h2">{{ NAME }} band lock</h2>
+        <h2 v-if="!embedded" class="hk-h2">{{ NAME }} band lock</h2>
         <span class="text-muted" style="font-size: 13px">{{ lock ? summary : 'Reading bands…' }}</span>
       </div>
       <v-btn variant="text" color="primary" height="40" :disabled="!lock || allOn" @click="picked = [...supported]">Allow all</v-btn>
@@ -80,6 +82,11 @@ async function apply(): Promise<void> {
 </template>
 
 <style scoped>
+.hk-band-embedded {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
 .hk-filter {
   height: 32px;
   padding: 0 14px;

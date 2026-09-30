@@ -17,6 +17,7 @@ import { usePoll } from '@/composables/poll'
 import { useSession } from '@/stores/session'
 import { useUi } from '@/stores/ui'
 import { uplinkViews } from '@/utils/uplinks'
+import { useFiveGRouter } from '@/composables/fivegRouter'
 import { useUptimeToday } from '@/composables/uptime'
 
 // Internet: live uplink status (5 s, the same sources as Home), and the
@@ -37,7 +38,13 @@ const live = usePoll(async () => {
   return { ifaces, mw, modem: st }
 }, 5000)
 
-const uplinks = computed(() => (live.data.value ? uplinkViews(live.data.value.ifaces, live.data.value.mw) : null))
+// A "5G router" has no wired uplink (its WAN port is a LAN port), so only
+// the 5G one is shown: no wired settings, no failover to set up.
+const { fiveG } = useFiveGRouter()
+const uplinks = computed(() => {
+  const all = live.data.value ? uplinkViews(live.data.value.ifaces, live.data.value.mw) : null
+  return all && fiveG.value ? all.filter((u) => u.cellular) : all
+})
 const wired = computed(() => uplinks.value?.find((u) => !u.cellular) ?? null)
 const cellular = computed(() => uplinks.value?.find((u) => u.cellular) ?? null)
 const lanIp = computed(() => live.data.value?.ifaces.find((i) => i.interface === 'lan')?.['ipv4-address']?.[0]?.address ?? null)
@@ -46,7 +53,11 @@ const wan = ref<WanConfig | null>(null)
 const mw = ref<MultiwanFull | null>(null)
 const router = ref<modem.RouterStatus | null>(null)
 async function loadSettings(): Promise<void> {
-  const [w, m, r] = await Promise.all([wanConfig(), multiwanFull(), hasModem.value ? modem.routerstatus().catch(() => null) : Promise.resolve(null)])
+  const [w, m, r] = await Promise.all([
+    wanConfig(),
+    multiwanFull(),
+    hasModem.value ? modem.routerstatus().catch(() => null) : Promise.resolve(null),
+  ])
   wan.value = w
   mw.value = m
   router.value = r
@@ -61,7 +72,7 @@ function saved(): void {
 </script>
 
 <template>
-  <PageHeader overline="Uplinks, failover and 5G" title="Internet">
+  <PageHeader :overline="fiveG ? '5G router: the SIM is your internet' : 'Uplinks, failover and 5G'" title="Internet">
     <template #actions>
       <v-btn v-if="hasMonitor" variant="text" color="primary" height="48" rounded="pill" to="/monitoring">
         <HkIcon name="chart" :size="18" class="mr-2" />Uptime &amp; quality
@@ -76,9 +87,9 @@ function saved(): void {
   <ConnectionHero v-else :uplinks="uplinks" :modem="live.data.value?.modem ?? null" :lan-ip="lanIp" :clients="null" hide-clients :uptime="uptime" />
 
   <div class="hk-inet">
-    <WanSettingsCard class="hk-inet__wide" :config="wan" :link="wired" @saved="saved" />
-    <CellUplinkCard v-if="hasModem" :link="cellular" :modem="live.data.value?.modem ?? null" />
-    <MultiWanSettingsCard class="hk-inet__wide" :config="mw" :status="live.data.value?.mw ?? null" @saved="saved" />
+    <WanSettingsCard v-if="!fiveG" class="hk-inet__wide" :config="wan" :link="wired" @saved="saved" />
+    <CellUplinkCard v-if="hasModem" :class="{ 'hk-inet__wide': fiveG }" :link="cellular" :modem="live.data.value?.modem ?? null" />
+    <MultiWanSettingsCard v-if="!fiveG" class="hk-inet__wide" :config="mw" :status="live.data.value?.mw ?? null" @saved="saved" />
     <RouterModeCard v-if="hasModem" :status="router" />
   </div>
 </template>

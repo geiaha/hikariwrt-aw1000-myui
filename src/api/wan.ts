@@ -141,3 +141,53 @@ export async function saveMultiwan(m: MultiwanFull): Promise<void> {
     await uci.commit('multiwan')
   })
 }
+
+// ---- the WAN port as a LAN port ("5G router") ----
+
+export interface WanPort {
+  /** uci section of the br-lan device */
+  bridge: string
+  /** the WAN interface's device, e.g. "wan" */
+  device: string
+  ports: string[]
+  inLan: boolean
+  hasWan6: boolean
+}
+
+/**
+ * Where the WAN port is now. Null when there is nothing safe to move: no
+ * br-lan device section, or a WAN device that isn't a plain port (a VLAN, an
+ * alias, a bridge of its own).
+ */
+export async function wanPort(): Promise<WanPort | null> {
+  try {
+    const v = await uci.getConfig('network')
+    const device = String(v.wan?.device ?? '')
+    const br = Object.values(v).find((s) => s['.type'] === 'device' && s.name === 'br-lan')
+    if (!br || !/^[A-Za-z0-9_-]+$/.test(device) || device.startsWith('br-')) return null
+    // "ports" is a list on most routers but a plain string on this one
+    // (aw1000-defaults writes it that way); both read the same.
+    const ports = list(br.ports)
+    return { bridge: br['.name'], device, ports, inLan: ports.includes(device), hasWan6: !!v.wan6 }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Put the WAN port into the LAN bridge, or take it back out. In the bridge,
+ * the wan and wan6 interfaces are disabled rather than deleted: their
+ * settings are kept for the day the router goes back to a wired uplink, and
+ * a DHCP client running on a bridge member would only fight the bridge.
+ */
+export async function setWanAsLan(p: WanPort, on: boolean): Promise<void> {
+  await staged(['network'], async () => {
+    const ports = on ? [...new Set([...p.ports, p.device])] : p.ports.filter((x) => x !== p.device)
+    await uci.set('network', p.bridge, { ports })
+    for (const iface of p.hasWan6 ? ['wan', 'wan6'] : ['wan']) {
+      if (on) await uci.set('network', iface, { disabled: '1' })
+      else await uci.del('network', iface, ['disabled'])
+    }
+    await uci.commit('network')
+  })
+}

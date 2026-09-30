@@ -3,26 +3,32 @@
 // router until apply(); leaving the wizard midway changes nothing.
 //
 // Apply order is chosen so the browser keeps its connection as long as
-// possible: password, name/time, WAN, APN and the "setup done" flag all
-// leave LAN and Wi-Fi alone, and Wi-Fi goes last with applyNow() (not
-// rollback) because changing the SSID/key of the network this browser is on
-// disconnects it, which would make a rollback always fire.
+// possible: password, name/time, WAN, APN, the 5G IP arrangement, multi-WAN
+// and the "setup done" flag all leave LAN and Wi-Fi alone, and Wi-Fi goes
+// last with applyNow() (not rollback) because changing the SSID/key (or the
+// country) of the network this browser is on disconnects it, which would make
+// a rollback always fire.
+//
+// The country chosen on the "Name and time" step is used twice: as the Wi-Fi
+// regulatory domain (which channels and power are legal) and to pick the
+// carrier list the 5G APN comes from - so the two can't disagree.
 
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import * as uci from '@/api/uci'
 import * as sys from '@/api/system'
 import * as modem from '@/api/modem'
-import { saveWan, wanConfig, type WanConfig } from '@/api/wan'
+import { multiwanFull, saveMultiwan, saveWan, setWanAsLan, wanConfig, wanPort, type MultiwanFull, type WanConfig, type WanPort } from '@/api/wan'
 import { wifiRadios, type WifiRadio } from '@/api/wifi'
 import { markSetupDone, wanCarrier } from '@/api/setup'
 import { useSession } from '@/stores/session'
 import { dnsError, ipError, keyError, mtuError, netmaskError, parseList, ssidError } from '@/utils/validate'
+import { countryByIso, guessCountry } from '@/utils/countries'
 
 export type StepId = 'welcome' | 'password' | 'system' | 'internet' | 'wifi' | 'review'
 export const STEPS: { id: StepId; title: string; lead: string }[] = [
   { id: 'welcome', title: 'Welcome', lead: 'A few minutes to get your router ready. Nothing changes until the last step.' },
   { id: 'password', title: 'Admin password', lead: 'Protects these settings. You’ll use it to sign in here, in LuCI and over SSH.' },
-  { id: 'system', title: 'Name and time', lead: 'What the router is called on your network, and where it is.' },
+  { id: 'system', title: 'Name, country and time', lead: 'What the router is called on your network, and where it is. The country sets which Wi-Fi channels are allowed.' },
   { id: 'internet', title: 'Internet', lead: 'How the router connects: a cable from your ISP, the 5G SIM, or both.' },
   { id: 'wifi', title: 'Wi-Fi', lead: 'The network your devices join.' },
   { id: 'review', title: 'Review', lead: 'Check everything, then set it up.' },
@@ -47,6 +53,9 @@ interface ApnForm {
   pdptype: string
 }
 
+/** failover: wired WAN first, 5G takes over when it fails. standalone: 5G only. */
+export type Usage = 'failover' | 'standalone'
+
 interface BandForm {
   section: string
   band: string
@@ -69,14 +78,34 @@ export function useSetup() {
     radios: [] as WifiRadio[],
     profile: null as modem.ProfileInfo | null,
     modem: null as modem.ModemStatus | null,
+    multiwan: null as MultiwanFull | null,
+    ipv6: null as modem.Ipv6Info | null,
+    wanPort: null as WanPort | null,
   })
+  // What the router is set up as now: standalone when multi-WAN has the wired
+  // WAN turned off or puts 5G first.
+  const origUsage = computed<Usage>(() => {
+    const f = orig.multiwan?.ifaces ?? []
+    const wan = f.find((i) => i.name === 'wan')
+    if (orig.wanPort?.inLan) return 'standalone'
+    return wan && (!wan.enabled || f[0]?.name === 'wwan0') ? 'standalone' : 'failover'
+  })
+  // The choice only exists with a modem and multi-WAN to act on it.
+  const hasUsage = computed(() => hasModem.value && !!orig.multiwan?.ifaces.some((i) => i.name === 'wwan0') && !!orig.multiwan.ifaces.some((i) => i.name === 'wan'))
+  const origCountry = computed(() => orig.radios.find((r) => r.country)?.country?.toUpperCase() ?? '')
+  const carriers = ref<modem.Carrier[]>([])
   const zones = ref<Record<string, { tzstring: string }>>({})
   const carrier = ref<boolean | null>(null)
 
   // ---- the draft ----
   const draft = reactive({
     password: { a: '', b: '' },
-    system: { hostname: '', zonename: '' },
+    system: { hostname: '', zonename: '', country: '' },
+    usage: 'failover' as Usage,
+    /** 5G router only: the WAN port joins the LAN bridge as one more LAN port. */
+    wanAsLan: true,
+    /** The 5G dial: v4only, dual (IPv4 + IPv6), v6only - or split, kept as it is. */
+    v6style: 'dual',
     wan: { proto: 'dhcp', username: '', password: '', ipaddr: '', netmask: '255.255.255.0', gateway: '', dns: '', mtu: '', ipv6: true },
     apn: { mode: 'auto', carrier: '', apn: '', auth: 'none', username: '', password: '', pdptype: '' } as ApnForm,
     wifi: { same: true, ssid: '', key: '', encryption: 'sae-mixed', bands: [] as BandForm[] },
@@ -85,7 +114,7 @@ export function useSetup() {
   async function load(): Promise<void> {
     loading.value = true
     try {
-      const [s, z, w, r, p, m, c] = await Promise.all([
+      const [s, z, w, r, p, m, c, mw, v6, wp] = await Promise.all([
         sys.systemSettings().catch(() => null),
         sys.timezones().catch(() => ({})),
         wanConfig(),
@@ -93,8 +122,12 @@ export function useSetup() {
         hasModem.value ? modem.profileinfo().catch(() => null) : Promise.resolve(null),
         hasModem.value ? modem.status().catch(() => null) : Promise.resolve(null),
         wanCarrier(),
+        multiwanFull().catch(() => null),
+        hasModem.value ? modem.ipv6info().catch(() => null) : Promise.resolve(null),
+        wanPort(),
       ])
-      Object.assign(orig, { system: s, wan: w, radios: r, profile: p?.ok ? p : null, modem: m })
+      Object.assign(orig, { system: s, wan: w, radios: r, profile: p?.ok ? p : null, modem: m, multiwan: mw, ipv6: v6?.ok ? v6 : null, wanPort: wp })
+      carriers.value = orig.profile?.carriers ?? []
       zones.value = z
       carrier.value = c
 
@@ -119,8 +152,14 @@ export function useSetup() {
       draft.system.hostname = o.system?.hostname ?? 'HikariWrt'
       draft.system.zonename =
         o.system && o.system.zonename !== 'UTC' ? o.system.zonename : browserZone in zones.value ? browserZone : (o.system?.zonename ?? 'UTC')
+      draft.system.country = guessCountry({ mcc: o.modem?.mcc, wifi: origCountry.value, locale: navigator.language })?.iso ?? origCountry.value
     }
     if (step === 'internet') {
+      draft.usage = origUsage.value
+      // Already a 5G router: keep the port where it is. Switching to one:
+      // offer the port as a LAN port.
+      draft.wanAsLan = origUsage.value === 'standalone' ? !!o.wanPort?.inLan : true
+      draft.v6style = o.ipv6?.config.style || 'dual'
       if (o.wan) Object.assign(draft.wan, { ...o.wan, dns: o.wan.dns.join(', ') })
       const a = o.profile?.apn
       if (a) {
@@ -150,6 +189,25 @@ export function useSetup() {
     }
   }
 
+  // The carrier list follows the chosen country. The router answers with the
+  // list for the network the SIM is on, so another country is asked for by
+  // its MCC; a carrier picked from the old list is let go.
+  watch(
+    () => draft.system.country,
+    async (iso) => {
+      const c = countryByIso(iso)
+      if (!hasModem.value || !c || !c.mcc.length) return
+      if (orig.profile && c.mcc.includes(orig.profile.mcc)) {
+        carriers.value = orig.profile.carriers ?? []
+      } else {
+        const r = await modem.profileinfoFor(c.mcc[0]!).catch(() => null)
+        if (draft.system.country !== iso) return
+        carriers.value = r?.ok ? (r.carriers ?? []) : []
+      }
+      if (draft.apn.mode === 'list' && !carriers.value.some((x) => x.id === draft.apn.carrier)) draft.apn.carrier = ''
+    },
+  )
+
   // ---- validation per step ----
   const passwordErrors = computed(() => {
     const { a, b } = draft.password
@@ -159,6 +217,8 @@ export function useSetup() {
 
   const wanErrors = computed(() => {
     const w = draft.wan
+    // 5G only: the wired settings are neither shown nor applied.
+    if (draft.usage === 'standalone' && hasUsage.value) return { username: null, ipaddr: null, netmask: null, gateway: null, dns: null, mtu: null }
     return {
       username: w.proto === 'pppoe' && !w.username.trim() ? 'Required' : null,
       ipaddr: w.proto === 'static' ? ipError(w.ipaddr) : null,
@@ -184,7 +244,7 @@ export function useSetup() {
   const valid = computed<Record<StepId, boolean>>(() => ({
     welcome: true,
     password: !passwordErrors.value.a && !passwordErrors.value.b,
-    system: /^[A-Za-z0-9][A-Za-z0-9-]{0,62}$/.test(draft.system.hostname) && draft.system.zonename in zones.value,
+    system: /^[A-Za-z0-9][A-Za-z0-9-]{0,62}$/.test(draft.system.hostname) && draft.system.zonename in zones.value && !!countryByIso(draft.system.country),
     internet: Object.values(wanErrors.value).every((e) => !e) && !apnError.value,
     wifi: !wifiErrors.value.ssid && !wifiErrors.value.key && wifiErrors.value.bands.every((b) => !b.ssid && !b.key),
     review: true,
@@ -202,6 +262,22 @@ export function useSetup() {
     mtu: draft.wan.mtu.trim(),
     ipv6: draft.wan.ipv6,
   }))
+  // Multi-WAN as the chosen use needs it: wired first with 5G behind it, or
+  // 5G alone with the wired WAN left out. Balance mode is only replaced when
+  // the choice actually changes (see changes.usage).
+  const usageNext = computed<MultiwanFull | null>(() => {
+    const m = orig.multiwan
+    if (!m) return null
+    const wan = m.ifaces.find((i) => i.name === 'wan')
+    const wwan = m.ifaces.find((i) => i.name === 'wwan0')
+    const rest = m.ifaces.filter((i) => i.name !== 'wan' && i.name !== 'wwan0')
+    if (!wan || !wwan) return null
+    const ifaces =
+      draft.usage === 'standalone'
+        ? [{ ...wwan, enabled: true }, { ...wan, enabled: false }, ...rest]
+        : [{ ...wan, enabled: true }, { ...wwan, enabled: true }, ...rest]
+    return { ...m, enabled: true, mode: 'failover', ifaces }
+  })
   const wifiNext = computed<BandForm[]>(() =>
     draft.wifi.same ? draft.wifi.bands.map((b) => ({ ...b, ssid: draft.wifi.ssid, key: draft.wifi.key, encryption: draft.wifi.encryption })) : draft.wifi.bands,
   )
@@ -220,11 +296,20 @@ export function useSetup() {
       const n = o.radios.flatMap((r) => r.networks).find((x) => x.section === b.section)
       return !n || n.ssid !== b.ssid || n.key !== b.key || n.encryption !== b.encryption
     })
+    const standalone = hasUsage.value && draft.usage === 'standalone'
+    const p = o.wanPort
+    // In the bridge when it should be out, or the other way round. Going back
+    // to wired always takes it out: the wired uplink needs its port.
+    const lanPort = !!p && (standalone ? draft.wanAsLan !== p.inLan : p.inLan)
     return {
       password: !!draft.password.a,
       system: !!o.system && (draft.system.hostname !== o.system.hostname || draft.system.zonename !== o.system.zonename),
-      wan: !!wan,
+      usage: hasUsage.value && draft.usage !== origUsage.value,
+      lanPort,
+      wan: !!wan && !standalone,
       apn,
+      ipv6: hasModem.value && !!o.ipv6 && draft.v6style !== (o.ipv6.config.style || 'dual'),
+      country: !!draft.system.country && o.radios.some((r) => (r.country || '').toUpperCase() !== draft.system.country),
       wifi,
     }
   })
@@ -250,7 +335,7 @@ export function useSetup() {
     if (c.wan) t.push({ id: 'wan', label: 'Connect the wired internet', state: 'pending', run: () => saveWan(wanNext.value) })
     if (c.apn) {
       const a = draft.apn
-      const row = orig.profile?.carriers?.find((x) => x.id === a.carrier)
+      const row = carriers.value.find((x) => x.id === a.carrier)
       const args =
         a.mode === 'auto'
           ? { mode: 'auto', apn: '', auth: 'none', username: '', password: '', pdptype: '', carrier: '' }
@@ -267,14 +352,59 @@ export function useSetup() {
         },
       })
     }
-    t.push({ id: 'done', label: 'Remember that setup is finished', state: 'pending', run: () => markSetupDone() })
-    if (c.wifi) {
+    if (c.ipv6 && orig.ipv6) {
+      const cfg = modem.withStyle(orig.ipv6.config, draft.v6style)
       t.push({
-        id: 'wifi',
-        label: 'Restart Wi-Fi with the new name and password',
+        id: 'ipv6',
+        label: 'Set the 5G IP version',
         state: 'pending',
         run: async () => {
-          for (const b of wifiNext.value) await uci.set('wireless', b.section, { ssid: b.ssid, key: b.key, encryption: b.encryption })
+          const r = await modem.setIpv6(cfg)
+          if (!r.ok) throw new Error(r.error || 'The modem refused the IP version.')
+        },
+      })
+    }
+    if (c.usage && usageNext.value) {
+      const next = usageNext.value
+      t.push({
+        id: 'usage',
+        label: draft.usage === 'standalone' ? 'Use 5G as the only internet' : 'Use the cable first, with 5G as backup',
+        state: 'pending',
+        run: () => saveMultiwan(next),
+      })
+    }
+    // After multi-WAN has stopped using the wired uplink (or before it starts
+    // using it again, which saveMultiwan above does in the same run).
+    if (c.lanPort && orig.wanPort) {
+      const p = orig.wanPort
+      const on = hasUsage.value && draft.usage === 'standalone' && draft.wanAsLan
+      t.push({
+        id: 'lanport',
+        label: on ? 'Turn the WAN port into a LAN port' : 'Give the WAN port back to the wired internet',
+        state: 'pending',
+        run: () => setWanAsLan(p, on),
+      })
+    }
+    t.push({ id: 'done', label: 'Remember that setup is finished', state: 'pending', run: () => markSetupDone() })
+    if (c.wifi || c.country) {
+      const country = draft.system.country
+      t.push({
+        id: 'wifi',
+        label: c.wifi ? 'Restart Wi-Fi with the new name and password' : 'Restart Wi-Fi for the new country',
+        state: 'pending',
+        run: async () => {
+          if (c.wifi) for (const b of wifiNext.value) await uci.set('wireless', b.section, { ssid: b.ssid, key: b.key, encryption: b.encryption })
+          // The regulatory domain decides which channels are legal. A channel
+          // pinned under the old country may not exist under the new one, and
+          // the radio would then not start at all - so it goes back to
+          // automatic. Not on a radio the mesh owns: every node has to stay on
+          // the mesh's channel, and the Mesh page moves them together.
+          if (c.country)
+            for (const r of orig.radios) {
+              const v: Record<string, string> = { country }
+              if (!r.meshOwned && r.channel !== 'auto') v.channel = 'auto'
+              await uci.set('wireless', r.name, v)
+            }
           // If this browser is on the Wi-Fi being changed, the reply may never
           // arrive: the router got the request, the connection just dropped.
           await Promise.race([uci.applyNow().catch(() => undefined), new Promise((r) => setTimeout(r, 8000))])
@@ -311,7 +441,7 @@ export function useSetup() {
   const retry = () => apply(tasks.value.findIndex((t) => t.state === 'failed'))
 
   return {
-    loading, loadError, load, fill, orig, zones, carrier, hasModem, draft,
+    loading, loadError, load, fill, orig, zones, carrier, hasModem, hasUsage, carriers, draft,
     passwordErrors, wanErrors, apnError, wifiErrors, valid, changes, wifiNext,
     tasks, applying, finished, apply, retry,
   }

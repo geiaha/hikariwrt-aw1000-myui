@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import HkIcon from '@/components/icons/HkIcon.vue'
 import type { IconName } from '@/components/icons/registry'
 import type { SetupState, StepId } from '@/composables/setup'
+import { countryByIso } from '@/utils/countries'
 
 // Everything that will change, in plain words, with a way back to each step.
 const props = defineProps<{ s: SetupState }>()
@@ -10,6 +11,7 @@ const emit = defineEmits<{ go: [step: StepId] }>()
 
 const PROTO: Record<string, string> = { dhcp: 'Automatic (DHCP)', pppoe: 'PPPoE', static: 'Static IP' }
 const APN: Record<string, string> = { auto: 'Automatic APN', list: 'Carrier APN', custom: 'Custom APN' }
+const PDP: Record<string, string> = { v4only: 'IPv4', dual: 'IPv4 + IPv6', split: 'IPv4 + IPv6 (two calls)', v6only: 'IPv6' }
 
 interface Row {
   icon: IconName
@@ -25,27 +27,51 @@ const rows = computed<Row[]>(() => {
   const d = s.draft
   const r: Row[] = [
     { icon: 'lock', title: 'Admin password', value: c.password ? 'A new password' : 'Unchanged', changed: c.password, step: 'password' },
-    { icon: 'system', title: 'Name and time', value: `${d.system.hostname} · ${d.system.zonename}`, changed: c.system, step: 'system' },
     {
-      icon: 'ethernet',
-      title: 'Cable internet',
-      value: `${PROTO[d.wan.proto] ?? d.wan.proto}${d.wan.proto === 'pppoe' ? ` as ${d.wan.username}` : d.wan.proto === 'static' ? ` ${d.wan.ipaddr}` : ''}`,
-      changed: c.wan,
-      step: 'internet',
+      icon: 'system',
+      title: 'Name, country and time',
+      value: `${d.system.hostname} · ${countryByIso(d.system.country)?.name ?? d.system.country} · ${d.system.zonename}`,
+      changed: c.system || c.country,
+      step: 'system',
     },
   ]
+  const standalone = s.hasUsage.value && d.usage === 'standalone'
+  if (s.hasUsage.value)
+    r.push({ icon: 'internet', title: 'Internet', value: standalone ? '5G router: the SIM is the internet' : 'Wired, with 5G as backup', changed: c.usage, step: 'internet' })
+  if (standalone && s.orig.wanPort)
+    r.push({
+      icon: 'ethernet',
+      title: 'WAN port',
+      value: d.wanAsLan ? 'Used as a LAN port' : 'Not used',
+      changed: c.lanPort,
+      step: 'internet',
+    })
+  if (!standalone)
+    r.push({
+      icon: 'ethernet',
+      title: 'Cable internet',
+      value: `${PROTO[d.wan.proto] ?? d.wan.proto}${d.wan.proto === 'pppoe' ? ` as ${d.wan.username}` : d.wan.proto === 'static' ? ` ${d.wan.ipaddr}` : ''} · ${d.wan.ipv6 ? 'IPv4 + IPv6' : 'IPv4'}`,
+      changed: c.wan,
+      step: 'internet',
+    })
   if (s.hasModem.value) {
-    const row = s.orig.profile?.carriers?.find((x) => x.id === d.apn.carrier)
+    const row = s.carriers.value.find((x) => x.id === d.apn.carrier)
     r.push({
       icon: 'cellular',
       title: '5G',
-      value: d.apn.mode === 'list' && row ? `${row.name} (${row.apn})` : d.apn.mode === 'custom' ? `APN ${d.apn.apn}` : APN.auto!,
-      changed: c.apn,
+      value: `${d.apn.mode === 'list' && row ? `${row.name} (${row.apn})` : d.apn.mode === 'custom' ? `APN ${d.apn.apn}` : APN.auto!}${s.orig.ipv6 ? ` · ${PDP[d.v6style] ?? d.v6style}` : ''}`,
+      changed: c.apn || c.ipv6,
       step: 'internet',
     })
   }
   const names = [...new Set(s.wifiNext.value.map((b) => b.ssid))]
-  r.push({ icon: 'wifi', title: 'Wi-Fi', value: names.join(' · ') || '—', changed: c.wifi, step: 'wifi' })
+  r.push({
+    icon: 'wifi',
+    title: 'Wi-Fi',
+    value: `${names.join(' · ') || '—'}${c.country ? ` · channels for ${countryByIso(d.system.country)?.name ?? d.system.country}` : ''}`,
+    changed: c.wifi || c.country,
+    step: 'wifi',
+  })
   return r
 })
 const anything = computed(() => Object.values(props.s.changes.value).some(Boolean))

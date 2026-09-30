@@ -32,12 +32,20 @@ export async function getSection(config: string, section: string): Promise<UciSe
   return r.values
 }
 
+/**
+ * Set options (staged). An empty list means "no values", but rpcd refuses one
+ * with Invalid argument, so those options are deleted instead - which is what
+ * uci itself does with a list that has nothing left in it.
+ */
 export async function set(
   config: string,
   section: string,
   values: Record<string, string | string[]>,
 ): Promise<void> {
-  await call('uci', 'set', { config, section, values })
+  const empty = Object.keys(values).filter((k) => Array.isArray(values[k]) && values[k].length === 0)
+  const rest = Object.fromEntries(Object.entries(values).filter(([k]) => !empty.includes(k)))
+  if (Object.keys(rest).length) await call('uci', 'set', { config, section, values: rest })
+  if (empty.length) await del(config, section, empty)
 }
 
 /**

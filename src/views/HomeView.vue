@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useDisplay } from 'vuetify'
 import PageHeader from '@/components/PageHeader.vue'
 import CellCard from '@/components/home/CellCard.vue'
 import ConnectionHero from '@/components/home/ConnectionHero.vue'
 import MultiWanCard from '@/components/home/MultiWanCard.vue'
+import QuickBandCard from '@/components/home/QuickBandCard.vue'
+import MessagesCard from '@/components/cellular/MessagesCard.vue'
+import * as modem from '@/api/modem'
+import { usePoll } from '@/composables/poll'
 import PhoneHero from '@/components/home/PhoneHero.vue'
 import PhoneStats from '@/components/home/PhoneStats.vue'
 import QuickSettings from '@/components/home/QuickSettings.vue'
@@ -19,6 +23,27 @@ const { xs } = useDisplay()
 const session = useSession()
 const d = useHomeData()
 const uptime = useUptimeToday()
+
+// A "5G router" has no wired WAN or multi-WAN to show, and the modem is the
+// whole connection - so Home carries the two things done most often with it:
+// band locking and the SMS inbox. Both use the modem's AT port, so they are
+// only fetched in that mode: the lock once (and after an apply), the inbox
+// once a minute.
+const modemHome = computed(() => d.fiveG.value && d.hasModem.value)
+const lock = ref<modem.LockInfo | null>(null)
+async function loadLock(): Promise<void> {
+  lock.value = await modem.lockinfo().catch(() => null)
+}
+const sms = usePoll(() => (modemHome.value ? modem.smslist().catch(() => null) : Promise.resolve(null)), 60000)
+watch(
+  modemHome,
+  (on) => {
+    if (!on) return
+    loadLock()
+    sms.refresh()
+  },
+  { immediate: true },
+)
 
 const f = computed(() => d.fast.data.value)
 const s = computed(() => d.slow.data.value)
@@ -59,8 +84,12 @@ const changedBoth = () => {
     </section>
     <PhoneStats :clients="d.clients.value" :usage="d.hasModem.value ? (s?.usage ?? null) : undefined" />
     <CellCard v-if="d.hasModem.value" :modem="f?.modem ?? null" :link="d.cellular.value" :loading="!f" />
+    <template v-if="modemHome">
+      <MessagesCard :sms="sms.data.value" :loading="sms.loading.value" title="SMS inbox" :limit="3" />
+      <QuickBandCard :lock="lock" @applied="loadLock" />
+    </template>
     <WifiCard :aps="s?.aps ?? null" :radios="s?.radios ?? null" :mesh="s?.mesh ?? null" @changed="changed" />
-    <MultiWanCard :uplinks="d.uplinks.value" :config="s?.mwConf ?? null" @changed="changedBoth" />
+    <MultiWanCard v-if="!d.fiveG.value" :uplinks="d.uplinks.value" :config="s?.mwConf ?? null" @changed="changedBoth" />
     <SystemCard :board="session.board" :info="f?.info ?? null" :cpu="d.cpu.value" :storage="s?.storage ?? null" />
   </template>
 
@@ -68,9 +97,13 @@ const changedBoth = () => {
   <template v-else>
     <ConnectionHero :uplinks="d.uplinks.value" :modem="f?.modem ?? null" :lan-ip="d.lanIp.value" :clients="d.clients.value?.total ?? null" :uptime="uptime" />
     <div class="hk-grid-3">
-      <WanCard :link="d.wired.value" :loading="!f" />
+      <WanCard v-if="!d.fiveG.value" :link="d.wired.value" :loading="!f" />
       <CellCard v-if="d.hasModem.value" :modem="f?.modem ?? null" :link="d.cellular.value" :loading="!f" />
-      <MultiWanCard :uplinks="d.uplinks.value" :config="s?.mwConf ?? null" @changed="changedBoth" />
+      <MultiWanCard v-if="!d.fiveG.value" :uplinks="d.uplinks.value" :config="s?.mwConf ?? null" @changed="changedBoth" />
+      <template v-if="modemHome">
+        <MessagesCard :sms="sms.data.value" :loading="sms.loading.value" title="SMS inbox" :limit="3" />
+        <QuickBandCard :lock="lock" @applied="loadLock" />
+      </template>
       <WifiCard :aps="s?.aps ?? null" :radios="s?.radios ?? null" :mesh="s?.mesh ?? null" @changed="changed" />
       <section class="hk-card" aria-label="Quick settings" style="gap: 14px">
         <h2 class="hk-h2">Quick settings</h2>

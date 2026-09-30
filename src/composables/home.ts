@@ -14,6 +14,7 @@ import * as svc from '@/api/services'
 import { usePoll } from '@/composables/poll'
 import { useSession } from '@/stores/session'
 import { uplinkViews, type UplinkView } from '@/utils/uplinks'
+import { useFiveGRouter } from './fivegRouter'
 
 export type { UplinkView } from '@/utils/uplinks'
 export type LinkState = 'active' | 'standby' | 'down'
@@ -65,10 +66,14 @@ export function useHomeData() {
   }, 15000)
 
   // ---- uplinks: multi-WAN's view when it runs, else the kernel's routes ----
+  // A "5G router" has no wired uplink (its WAN port is a LAN port), so only
+  // the 5G one is listed.
 
+  const { fiveG } = useFiveGRouter()
   const uplinks = computed<UplinkView[] | null>(() => {
     const d = fast.data.value
-    return d ? uplinkViews(d.ifaces, d.mw) : null
+    const all = d ? uplinkViews(d.ifaces, d.mw) : null
+    return all && fiveG.value ? all.filter((u) => u.cellular) : all
   })
 
   const active = computed(() => uplinks.value?.find((u) => u.state === 'active') ?? null)
@@ -85,7 +90,7 @@ export function useHomeData() {
     return { total: s.leases.length, wifi, wired: s.leases.length - wifi, list: s.leases }
   })
 
-  return { fast, slow, cpu, uplinks, active, wired, cellular, lanIp, clients, hasModem }
+  return { fast, slow, cpu, uplinks, active, wired, cellular, lanIp, clients, hasModem, fiveG }
 }
 
 export type HomeData = ReturnType<typeof useHomeData>

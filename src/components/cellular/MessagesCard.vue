@@ -4,9 +4,9 @@ import HkIcon from '@/components/icons/HkIcon.vue'
 import type { SmsList } from '@/api/modem'
 import { joinSms } from '@/utils/cellular'
 
-const props = defineProps<{ sms: SmsList | null; loading: boolean }>()
+const props = withDefaults(defineProps<{ sms: SmsList | null; loading: boolean; title?: string; limit?: number }>(), { title: 'Messages', limit: 2 })
 
-const threads = computed(() => (props.sms ? joinSms(props.sms.stores.flatMap((s) => s.msg.map((m) => ({ ...m, store: s.name })))) : []).slice(0, 2))
+const threads = computed(() => (props.sms ? joinSms(props.sms.stores.flatMap((s) => s.msg.map((m) => ({ ...m, store: s.name })))) : []).slice(0, props.limit))
 
 function when(ts: string): string {
   const d = new Date(ts.replace(' ', 'T'))
@@ -23,8 +23,8 @@ function when(ts: string): string {
 <template>
   <section class="hk-card" aria-label="Messages" style="padding-bottom: 14px; gap: 6px; flex-grow: 1">
     <div class="d-flex align-center mb-1">
-      <h2 class="hk-h2 flex-grow-1">Messages</h2>
-      <router-link :to="{ query: { tab: 'sms' } }" class="hk-link" style="margin: 0 -12px 0 0">Inbox <HkIcon name="arrowRight" :size="18" /></router-link>
+      <h2 class="hk-h2 flex-grow-1">{{ title }}</h2>
+      <router-link :to="{ path: '/cellular', query: { tab: 'sms' } }" class="hk-link" style="margin: 0 -12px 0 0">Inbox <HkIcon name="arrowRight" :size="18" /></router-link>
     </div>
     <template v-if="sms">
       <div v-for="(t, i) in threads" :key="i" class="hk-msg">
