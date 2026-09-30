@@ -149,7 +149,9 @@ onBeforeUnmount(() => clearTimeout(timer))
           Starting a test accepts Ookla's licence, terms of use and privacy policy (speedtest.net).
         </p>
 
-        <div class="d-flex justify-end ga-2">
+        <!-- mt-auto: on a phone the dialog is full screen, and the action
+             belongs at the bottom, within reach of a thumb -->
+        <div class="d-flex justify-end ga-2 mt-auto">
           <v-btn v-if="run" variant="text" @click="cancel">Stop</v-btn>
           <v-btn v-else color="primary" variant="flat" size="large" :loading="starting" :disabled="!iface" @click="start">
             {{ last ? 'Test again' : 'Start test' }}

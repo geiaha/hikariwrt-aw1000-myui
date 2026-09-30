@@ -88,11 +88,13 @@ body,
   gap: 16px;
   min-width: 0;
 }
-/* Vuetify inputs are flex: 1 1 auto; placed directly in a column card that
-   stretches them vertically to fill the row height. Only direct children:
-   inputs inside a row (a form or div laid out with d-flex) must keep
-   growing sideways. */
-.hk-card > .v-input {
+/* Vuetify inputs are flex: 1 1 auto; placed directly in a column (a card,
+   or a full-screen dialog on a phone - the speed test's "Test over" select
+   filled the whole screen) that stretches them vertically to fill it. Only
+   direct children of a column: inputs inside a row (a form or div laid out
+   with d-flex) must keep growing sideways. */
+.hk-card > .v-input,
+.flex-column > .v-input {
   flex: 0 0 auto;
 }
 .hk-tile {
