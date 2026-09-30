@@ -5,7 +5,7 @@ import ArcGauge from '@/components/m3/ArcGauge.vue'
 import M3Progress from '@/components/m3/M3Progress.vue'
 import type { LockInfo, ModemDiag, ModemStatus, ProfileInfo } from '@/api/modem'
 import { bandDescription, gnbId, qualityHeadline, RANGES, scale } from '@/utils/cellular'
-import { signed } from '@/utils/format'
+import { bitrate, signed } from '@/utils/format'
 
 const props = defineProps<{ modem: ModemStatus | null; diag: ModemDiag | null; lock: LockInfo | null; profile: ProfileInfo | null }>()
 
@@ -38,6 +38,8 @@ const facts = computed(() => {
     { k: 'IMS', v: props.diag ? (ims.value ? 'Registered' : 'Not registered') : '—', strong: true },
     { k: 'Data session', v: m?.link?.ipv4 ? `IPv4 · ${m.link.ipv4}` : m?.link?.up ? 'Up' : 'Down', strong: true },
     { k: 'APN', v: props.profile?.apn.value || '—' },
+    // the network's ceiling on this data session, per direction
+    { k: 'Max speed (AMBR)', v: m?.ambr ? `↓ ${bitrate(m.ambr.dl)} · ↑ ${bitrate(m.ambr.ul)}` : '—', strong: true },
   ]
 })
 </script>

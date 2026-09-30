@@ -2,6 +2,7 @@
 import HkIcon from '@/components/icons/HkIcon.vue'
 import type { ModemStatus } from '@/api/modem'
 import type { UplinkView } from '@/utils/uplinks'
+import { bitrate } from '@/utils/format'
 
 defineProps<{ link: UplinkView | null; modem: ModemStatus | null }>()
 </script>
@@ -21,6 +22,9 @@ defineProps<{ link: UplinkView | null; modem: ModemStatus | null }>()
       <div><dt>Band</dt><dd>{{ modem?.signal?.band ?? '—' }}</dd></div>
       <div><dt>Address</dt><dd>{{ link?.ipv4 ?? '—' }}</dd></div>
       <div><dt>Latency</dt><dd>{{ link?.latency != null ? `${link.latency.toFixed(0)} ms` : '—' }}</dd></div>
+      <div v-if="modem?.ambr" title="Aggregate Maximum Bit Rate: the most the network lets this connection carry">
+        <dt>Max speed</dt><dd>↓ {{ bitrate(modem.ambr.dl) }} · ↑ {{ bitrate(modem.ambr.ul) }}</dd>
+      </div>
     </dl>
     <div class="d-flex flex-wrap ga-2 mt-auto">
       <v-btn to="/cellular" variant="outlined" color="primary" height="40" style="border-color: rgb(var(--v-theme-outline))">Cellular</v-btn>

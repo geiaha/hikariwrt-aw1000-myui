@@ -47,6 +47,8 @@ export interface ModemStatus {
   /** The network the modem is registered on, as strings ("515", "02"). */
   mcc?: string | null
   mnc?: string | null
+  /** Aggregate Maximum Bit Rate of the data session, kbps: the network's speed ceiling. */
+  ambr?: { dl: number; ul: number; apn: string | null; rat: 'lte' | 'nr' } | null
   tac?: string
   gnb_id_bits?: number
   error?: string | null

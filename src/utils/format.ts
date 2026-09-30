@@ -55,3 +55,21 @@ export function signed(n: number | null | undefined): string {
   if (n == null) return '—'
   return n < 0 ? `−${Math.abs(n)}` : String(n)
 }
+
+/**
+ * A bit rate given in kbps, in the unit that reads best: "512 kbps",
+ * "42 Mbps", "1.5 Gbps" (decimal, as line speeds are sold). The unit is
+ * picked after rounding, so 999999 kbps reads "1 Gbps", not "1000 Mbps".
+ */
+export function bitrate(kbps: number | null | undefined): string {
+  if (kbps == null || !Number.isFinite(kbps)) return '—'
+  const units = ['kbps', 'Mbps', 'Gbps']
+  let v = kbps
+  let i = 0
+  while (i < units.length - 1 && Math.round(v) >= 1000) {
+    v /= 1000
+    i++
+  }
+  const s = v >= 100 || Number.isInteger(v) ? String(Math.round(v)) : v.toFixed(v >= 10 ? 1 : 2).replace(/\.?0+$/, '')
+  return `${s} ${units[i]}`
+}

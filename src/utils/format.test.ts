@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bytes, duration, load, percent } from './format'
+import { bytes, duration, load, percent, bitrate } from './format'
 
 describe('bytes', () => {
   it('uses decimal units', () => {
@@ -41,4 +41,20 @@ it('durationLong reads as a sentence', async () => {
   expect(durationLong(20)).toBe('1 min')
   expect(signed(-98)).toBe('−98')
   expect(signed(12)).toBe('12')
+})
+
+describe('bitrate', () => {
+  it('reads in kbps, Mbps or Gbps', () => {
+    expect(bitrate(512)).toBe('512 kbps')
+    expect(bitrate(42000)).toBe('42 Mbps')
+    expect(bitrate(12345)).toBe('12.3 Mbps')
+    expect(bitrate(1500000)).toBe('1.5 Gbps')
+  })
+  it('moves up a unit when rounding reaches 1000', () => {
+    expect(bitrate(999999)).toBe('1 Gbps')
+    expect(bitrate(999.6)).toBe('1 Mbps')
+  })
+  it('shows a dash for nothing', () => {
+    expect(bitrate(null)).toBe('—')
+  })
 })
